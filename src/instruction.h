@@ -7,7 +7,9 @@ typedef union instruction_args {
   } addi;
 } instruction_args_t;
 
-typedef enum opcode { OP_NOP, OP_ADDI } opcode_t;
+typedef enum opcode { 
+  OP_ADDI = 0b0010011
+} opcode_t;
 
 typedef struct instruction {
   opcode_t opcode : 7;

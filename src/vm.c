@@ -40,13 +40,13 @@ int step_vm(VM_t *vm) {
 
   DEBUG("instruction type: %i\n", op->opcode);
   switch (op->opcode) {
-  case OP_NOP:
-    break;
-  case OP_ADDI: {
-  }
+  case OP_ADDI:
+    if (op->args.addi.rd == REG_ZERO) // nop
+      break;
+
     int b = read_register(vm, op->args.addi.rs1);
-    DEBUG("b value: %i\n", b);
-    int ret = write_register(vm, op->args.addi.rd, b + op->args.addi.imm);
+    int imm = op->args.addi.imm;
+    int ret = write_register(vm, op->args.addi.rd, b + imm);
     if (ret != 0)
       return ret;
 
@@ -71,13 +71,14 @@ int write_register(VM_t *vm, int register_idx, int value) {
   if (debug)
     assert(register_idx < 32 && register_idx > 0);
 
+  // ignore writes to zero and gp
   switch (register_idx) {
   case REG_ZERO:
   case REG_GP:
-    return VM_EXIT_ILLEGAL_REGISTER_WRITE;
+    return 0;
   }
 
-  memcpy((int*)&vm->registers + register_idx, &value, sizeof(int));
+  memcpy((int *)&vm->registers + register_idx, &value, sizeof(int));
   return 0;
 }
 
@@ -85,7 +86,7 @@ int read_register(VM_t *vm, int register_idx) {
   if (debug)
     assert(register_idx < 32 && register_idx > 0);
 
-  return *((int*)&vm->registers + register_idx);
+  return *((int *)&vm->registers + register_idx);
 }
 
 void free_vm(VM_t *vm) {
@@ -96,9 +97,8 @@ void free_vm(VM_t *vm) {
 int main(int argv, char *argc[]) {
   VM_t *vm = malloc(sizeof(VM_t));
 
-
   instruction_t instructions[] = {
-      {OP_NOP, {.addi = {0}}},
+      {OP_ADDI, {.addi = {0}}}, // nop
 
       {OP_ADDI, {.addi = {.rd = REG_T0, .funct3 = 0, .rs1 = REG_T0, .imm = 1}}},
       {OP_ADDI, {.addi = {.rd = REG_T0, .funct3 = 0, .rs1 = REG_T0, .imm = 1}}},
