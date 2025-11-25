@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include "instruction.h"
 #include "memory.h"
+#include "registers.h"
 
 #define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
 #define BYTE_TO_BINARY(byte)  \
@@ -21,11 +22,20 @@ void unknown_instruction(instruction_t *op) {
   printf("\ninstruction: 0x%08x\n", *(unsigned int*)op);
 }
 
+int write_register(int register_idx, int value) {
+  assert(0);
+}
+int read_register(int register_idx, int *out) {
+  assert(0);
+}
+
 struct Stat simulate(struct memory *mem, int start_addr, FILE *log_file, struct symbols* symbols) {
   int run = 1;
-  int addr = start_addr;
+  registers_t registers;
+  registers.pc = start_addr;
+
   while (run) {
-    int m = memory_read_word(mem, addr);
+    int m = memory_read_word(mem, registers.pc);
     instruction_t *op = (instruction_t*)&m;
 
     switch (op->opcode) {
@@ -47,7 +57,7 @@ struct Stat simulate(struct memory *mem, int start_addr, FILE *log_file, struct 
       break;
     }
 
-    addr += 4;
+    registers.pc += 4;
   }
 
   // TODO: fix
