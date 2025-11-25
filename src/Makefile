@@ -1,16 +1,19 @@
-GCC=gcc -g -Wall -Wextra -pedantic -std=gnu11 # without debugging symbols
-CFLAGS=--debug -ggdb -Wall -Wextra -pedantic -std=gnu11
-LD_FLAGS= -lpthread -lm --debug -ggdb
+# GCC=gcc -g -Wall -Wextra -pedantic -std=gnu11 
+GCC=gcc -g -Wall -Wextra -pedantic -std=gnu11 -O
+CFLAGS=-g -Wall -Wextra -pedantic -std=gnu11 -O
+LD_FLAGS=-g -Wall -Wextra -pedantic -std=gnu11 -O
 
-all: vm
-
+all: sim
 rebuild: clean all
 
-instructions.o: instructions.c instructions.h
-	$(GCC) -c $< -o $@
+# sim nedds simulate and disassemble to work!
+sim: *.c *.h
+	$(GCC) *.c -o sim 
 
-peer: vm.c vm.h instructions.o
-	$(GCC) $< *.o -o $@ $(LD_FLAGS) 
+zip: ../src.zip
+
+../src.zip: clean
+	cd .. && zip -r src.zip src/Makefile src/*.c src/*.h
 
 clean:
-	rm -rf *.o vm vgcore*
+	rm -rf *.o sim  vgcore*
