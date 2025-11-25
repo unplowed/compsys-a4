@@ -32,7 +32,7 @@ int *get_page(struct memory *mem, int addr)
   return mem->pages[page_number];
 }
 
-void memory_wr_w(struct memory *mem, int addr, int data)
+void memory_write_word(struct memory *mem, int addr, int data)
 {
   if (addr & 0x3)
   {
@@ -43,7 +43,7 @@ void memory_wr_w(struct memory *mem, int addr, int data)
   page[(addr >> 2) & 0x3fff] = data;
 }
 
-void memory_wr_h(struct memory *mem, int addr, int data)
+void memory_write_halfword(struct memory *mem, int addr, int data)
 {
   if (addr & 0x1)
   {
@@ -58,7 +58,7 @@ void memory_wr_h(struct memory *mem, int addr, int data)
     page[index] = (page[index] & 0x0000ffff) | ((unsigned)data << 16);
 }
 
-void memory_wr_b(struct memory *mem, int addr, int data)
+void memory_write_byte(struct memory *mem, int addr, int data)
 {
   int *page = get_page(mem, addr);
   int index = (addr >> 2) & 0x3fff;
@@ -79,7 +79,7 @@ void memory_wr_b(struct memory *mem, int addr, int data)
   }
 }
 
-int memory_rd_w(struct memory *mem, int addr)
+int memory_read_word(struct memory *mem, int addr)
 {
   int *page = get_page(mem, addr);
   if (addr & 0x3)
@@ -90,7 +90,7 @@ int memory_rd_w(struct memory *mem, int addr)
   return page[(addr >> 2) & 0x3fff];
 }
 
-int memory_rd_h(struct memory *mem, int addr)
+int memory_read_halfword(struct memory *mem, int addr)
 {
   int *page = get_page(mem, addr);
   int index = (addr >> 2) & 0x3fff;
@@ -105,7 +105,7 @@ int memory_rd_h(struct memory *mem, int addr)
     return (page[index] >> 16) & 0xffff;
 }
 
-int memory_rd_b(struct memory *mem, int addr)
+int memory_read_byte(struct memory *mem, int addr)
 {
   int *page = get_page(mem, addr);
   int index = (addr >> 2) & 0x3fff;

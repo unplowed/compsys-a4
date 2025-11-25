@@ -84,7 +84,7 @@ int read_elf(struct memory* mem, struct program_info* info, const char *filename
             // printf("All bytes of %s segment:\n", segment_type);
             for (unsigned int j = 0; j < program_header.p_filesz; j++) {
                 // printf("%02x ", segment_data[j]);
-                memory_wr_b(mem, program_header.p_vaddr + j, segment_data[j]);
+                memory_write_byte(mem, program_header.p_vaddr + j, segment_data[j]);
             }
             /*
             printf("\n\nDisassembly\n");

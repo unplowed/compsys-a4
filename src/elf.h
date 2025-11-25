@@ -67,8 +67,8 @@ typedef struct
   Elf32_Half	e_machine;		/* Architecture */
   Elf32_Word	e_version;		/* Object file version */
   Elf32_Addr	e_entry;		/* Entry point virtual address */
-  Elf32_Off	e_phoff;		/* Program header table file offset */
-  Elf32_Off	e_shoff;		/* Section header table file offset */
+  Elf32_Off	  e_phoff;		/* Program header table file offset */
+  Elf32_Off	  e_shoff;		/* Section header table file offset */
   Elf32_Word	e_flags;		/* Processor-specific flags */
   Elf32_Half	e_ehsize;		/* ELF header size in bytes */
   Elf32_Half	e_phentsize;		/* Program header table entry size */
@@ -85,8 +85,8 @@ typedef struct
   Elf64_Half	e_machine;		/* Architecture */
   Elf64_Word	e_version;		/* Object file version */
   Elf64_Addr	e_entry;		/* Entry point virtual address */
-  Elf64_Off	e_phoff;		/* Program header table file offset */
-  Elf64_Off	e_shoff;		/* Section header table file offset */
+  Elf64_Off	  e_phoff;		/* Program header table file offset */
+  Elf64_Off	  e_shoff;		/* Section header table file offset */
   Elf64_Word	e_flags;		/* Processor-specific flags */
   Elf64_Half	e_ehsize;		/* ELF header size in bytes */
   Elf64_Half	e_phentsize;		/* Program header table entry size */

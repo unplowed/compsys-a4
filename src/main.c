@@ -38,14 +38,14 @@ int pass_args_to_program(struct memory* mem, int argc, char* argv[]) {
     unsigned count_addr = 0x1000000;
     unsigned argv_addr = 0x1000004;
     unsigned str_addr = argv_addr + 4 * num_args;
-    memory_wr_w(mem, count_addr, num_args);
+    memory_write_word(mem, count_addr, num_args);
     for (int index = 0; index < num_args; ++index) {
-      memory_wr_w(mem, argv_addr + 4 * index, str_addr);
+      memory_write_word(mem, argv_addr + 4 * index, str_addr);
       char* cp = argv[first_arg + index];
       int c;
       do {
         c = *cp++;
-        memory_wr_b(mem, str_addr++, c);
+        memory_write_byte(mem, str_addr++, c);
       } while (c);
     }
   }
@@ -59,7 +59,7 @@ void disassemble_to_stdout(struct memory* mem, struct program_info* prog_info, s
   const int buf_size = 100;
   char disassembly[buf_size];
   for (unsigned int addr = prog_info->text_start; addr < prog_info->text_end; addr += 4) {
-    unsigned int instruction = memory_rd_w(mem, addr);
+    unsigned int instruction = memory_read_word(mem, addr);
     disassemble(addr, instruction, disassembly, buf_size, symbols);
     printf("%8x : %08X       %s\n", addr, instruction, disassembly);
   }
@@ -106,10 +106,10 @@ int main(int argc, char *argv[])
     int start_addr = prog_info.start;
     clock_t before = clock();
     struct Stat stats = simulate(mem, start_addr, log_file, symbols);
-    long int num_insns = stats.insns;
+    long int number_of_instructions = stats.instructions;
     clock_t after = clock();
     int ticks = after - before;
-    double mips = (1.0 * num_insns * CLOCKS_PER_SEC) / ticks / 1000000;
+    double mips = (1.0 * number_of_instructions * CLOCKS_PER_SEC) / ticks / 1000000;
     if (argc == 4 && !strcmp(argv[2], "-s"))
     {
       log_file = fopen(argv[3], "w");
@@ -120,12 +120,12 @@ int main(int argc, char *argv[])
     }
     if (log_file)
     {
-      fprintf(log_file, "\nSimulated %ld instructions in %d host ticks (%f MIPS)\n", num_insns, ticks, mips);
+      fprintf(log_file, "\nSimulated %ld instructions in %d host ticks (%f MIPS)\n", number_of_instructions, ticks, mips);
       fclose(log_file);
     }
     else
     {
-      printf("\nSimulated %ld instructions in %d host ticks (%f MIPS)\n", num_insns, ticks, mips);
+      printf("\nSimulated %ld instructions in %d host ticks (%f MIPS)\n", number_of_instructions, ticks, mips);
     }
     memory_delete(mem);
   }
