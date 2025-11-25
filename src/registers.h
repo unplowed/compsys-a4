@@ -1,37 +1,40 @@
-typedef struct registers {
-  int zero;  // x0
-  int ra;    // x1, return address
-  int sp;    // x2, stack pointer
-  int gp;    // x3, global pointer
-  int tp;    // x4, thread pointer
-  int t0;    // x5, temporary 0
-  int t1;    // x6, temporary 1
-  int t2;    // x7, temporary 2
-  int s0_fp; // x8, saved register 0 / frame pointer
-  int s1;    // x9 saved register 1
-  int a0;    // x10, function argument 0 / return value 0
-  int a1;    // x11, function argument 1 / return value 1
-  int a2;    // x12, function argument 2
-  int a3;    // x13, function argument 3
-  int a4;    // x14, function argument 4
-  int a5;    // x15, function argument 5
-  int a6;    // x16, function argument 6
-  int a7;    // x17, function argument 7
-  int s2;    // x18, saved register 2
-  int s3;    // x19, saved register 3
-  int s4;    // x20, saved register 4
-  int s5;    // x21, saved register 5
-  int s6;    // x22, saved register 6
-  int s7;    // x23, saved register 7
-  int s8;    // x24, saved register 8
-  int s9;    // x25, saved register 9
-  int s10;   // saved x26, register 10
-  int s11;   // saved x27, register 11
-  int t3;    // x28, temporary register 3
-  int t4;    // x29, temporary register 4
-  int t5;    // x30, temporary register 5
-  int t6;    // x31, temporary register 6
-  int pc;    // extra register, program counter / current instruction
+typedef union registers {
+  struct {
+    int zero;  // x0
+    int ra;    // x1, return address
+    int sp;    // x2, stack pointer
+    int gp;    // x3, global pointer
+    int tp;    // x4, thread pointer
+    int t0;    // x5, temporary 0
+    int t1;    // x6, temporary 1
+    int t2;    // x7, temporary 2
+    int s0_fp; // x8, saved register 0 / frame pointer
+    int s1;    // x9 saved register 1
+    int a0;    // x10, function argument 0 / return value 0
+    int a1;    // x11, function argument 1 / return value 1
+    int a2;    // x12, function argument 2
+    int a3;    // x13, function argument 3
+    int a4;    // x14, function argument 4
+    int a5;    // x15, function argument 5
+    int a6;    // x16, function argument 6
+    int a7;    // x17, function argument 7
+    int s2;    // x18, saved register 2
+    int s3;    // x19, saved register 3
+    int s4;    // x20, saved register 4
+    int s5;    // x21, saved register 5
+    int s6;    // x22, saved register 6
+    int s7;    // x23, saved register 7
+    int s8;    // x24, saved register 8
+    int s9;    // x25, saved register 9
+    int s10;   // saved x26, register 10
+    int s11;   // saved x27, register 11
+    int t3;    // x28, temporary register 3
+    int t4;    // x29, temporary register 4
+    int t5;    // x30, temporary register 5
+    int t6;    // x31, temporary register 6
+    int pc;    // extra register, program counter / current instruction
+  } named;
+  int unnamed[32]; // 1 byte shorter, as pc cannot be referenced by rd
 } registers_t;
 
 typedef enum registers_idx_map {
@@ -67,9 +70,46 @@ typedef enum registers_idx_map {
  	REG_T4 = 29, 
  	REG_T5 = 30, 
  	REG_T6 = 31, 
+  REG_PC = 32,
 } registers_idx_t;
 
+const char* register_names[] = {
+  "zero x0",
+  "ra x1, return address",
+  "sp x2, stack pointer",
+  "gp x3, global pointer",
+  "tp x4, thread pointer",
+  "t0 x5, temporary 0",
+  "t1 x6, temporary 1",
+  "t2 x7, temporary 2",
+  "s0_fp x8, saved register 0 / frame pointer",
+  "s1 x9 saved register 1",
+  "a0 x10, function argument 0 / return value 0",
+  "a1 x11, function argument 1 / return value 1",
+  "a2 x12, function argument 2",
+  "a3 x13, function argument 3",
+  "a4 x14, function argument 4",
+  "a5 x15, function argument 5",
+  "a6 x16, function argument 6",
+  "a7 x17, function argument 7",
+  "s2 x18, saved register 2",
+  "s3 x19, saved register 3",
+  "s4 x20, saved register 4",
+  "s5 x21, saved register 5",
+  "s6 x22, saved register 6",
+  "s7 x23, saved register 7",
+  "s8 x24, saved register 8",
+  "s9 x25, saved register 9",
+  "s10 saved x26, register 10",
+  "s11 saved x27, register 11",
+  "t3 x28, temporary register 3",
+  "t4 x29, temporary register 4",
+  "t5 x30, temporary register 5",
+  "t6 x31, temporary register 6",
+  "pc extra register, program counter / current instruction",
+};
+
 // Writes `value` to the given register. Returns non-zero on error
-int write_register(int register_idx, int value);
+int write_register(registers_t* registers, int register_idx, int value);
 // Reads the value of the given register into `out`. Returns non-zero on error
-int read_register(int register_idx, int* out);
+int read_register(const registers_t* registers, int register_idx, int* out);
