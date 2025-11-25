@@ -25,6 +25,9 @@
             gnumake
             lldb
             zip
+            (python3.withPackages(pkgs: with pkgs; [
+              requests
+            ]))
           ];
         };
       }
