@@ -72,7 +72,7 @@ typedef enum registers_idx_map {
 } vm_registers_idx_t;
 
 typedef struct VM {
-  void *ip;
+  instruction_t *ip;
 
   void *memory;
   unsigned long memory_size;

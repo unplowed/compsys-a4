@@ -29,12 +29,12 @@ int step_vm(VM_t *vm) {
 
   DEBUG("instruction pointer:  %p\n", op);
   DEBUG("instructions boundry: %p-%p\n", vm->memory,
-        vm->memory + vm->instructions_size);
+        (vm->memory + vm->instructions_size));
 
   // Bounds check
   if (((unsigned long)op >
-       (unsigned long)(vm->memory + vm->instructions_size)) ||
-      ((unsigned long)op < (unsigned long)(vm->memory))) {
+       ((unsigned long)vm->memory + vm->instructions_size)) ||
+      ((unsigned long)op < (unsigned long)vm->memory)) {
     return VM_EXIT_OUT_OF_BOUNDS_INSTRUCTION;
   }
 
@@ -53,14 +53,14 @@ int step_vm(VM_t *vm) {
     break;
   }
 
-  vm->ip += sizeof(instruction_t);
+  vm->ip++;
 
   if ((unsigned long)vm->ip ==
-      (unsigned long)(vm->memory + vm->instructions_size)) {
+      ((unsigned long)vm->memory + vm->instructions_size)) {
     return VM_EXIT_END_OF_INSTRUCTIONS;
   }
   if ((unsigned long)vm->ip >
-      (unsigned long)(vm->memory + vm->instructions_size)) {
+      ((unsigned long)vm->memory + vm->instructions_size)) {
     return VM_EXIT_OUT_OF_BOUNDS_INSTRUCTION;
   }
 
@@ -94,7 +94,7 @@ void free_vm(VM_t *vm) {
   free(vm);
 }
 
-int main(int argv, char *argc[]) {
+int main() {
   VM_t *vm = malloc(sizeof(VM_t));
 
   instruction_t instructions[] = {
