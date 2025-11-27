@@ -19,8 +19,8 @@ typedef enum opcode {
   OP_ECALL = 0b1110011,
 } opcode_t;
 
-typedef union __attribute__((packed)) instruction_args {
-  struct __attribute__((packed)) r_type {
+typedef union instruction_args {
+  struct r_type {
     opcode_t opcode : 7;
     unsigned int rd : 5;
     unsigned int funct3 : 3;
@@ -28,27 +28,37 @@ typedef union __attribute__((packed)) instruction_args {
     unsigned int rs2 : 5;
     unsigned int funct7 : 7;
   } R;
-  struct __attribute__((packed)) i_type {
+  struct i_type {
     opcode_t opcode : 7;
     unsigned int rd : 5;
     unsigned int funct3 : 3;
     unsigned int rs1 : 5;
     int imm12 : 12;
   } I;
-  struct __attribute__((packed)) s_type {
+  struct s_type {
     opcode_t opcode : 7;
     int imm11 : 5;
     unsigned int funct3 : 3;
     unsigned int rs1 : 5;
     unsigned int rs2 : 5;
-    int imm31 : 7;
+    int imm12 : 7;
   } S;
-  struct __attribute__((packed)) u_type {
+  struct b_type {
+    opcode_t opcode : 7;
+    unsigned int imm7 : 1;
+    unsigned int imm11 : 4;
+    unsigned int funct3 : 3;
+    unsigned int rs1 : 5;
+    unsigned int rs2 : 5;
+    unsigned int imm12 : 6;
+    unsigned imm31 : 1;
+  } B;
+  struct u_type {
     opcode_t opcode : 7;
     unsigned int rd : 5;
     int imm20 : 20;
   } U;
-  struct __attribute__((packed)) j_type {
+  struct j_type {
     opcode_t opcode : 7;
     unsigned int rd : 5;
     int imm11 : 9;
@@ -56,7 +66,13 @@ typedef union __attribute__((packed)) instruction_args {
   } J;
 } instruction_args_t;
 
-typedef union __attribute__((packed)) instruction {
+typedef union instruction {
   opcode_t opcode : 7;
   instruction_args_t args;
 } instruction_t;
+
+int decode_i_immediate(instruction_t *instruction);
+int decode_s_immediate(instruction_t *instruction);
+int decode_b_immediate(instruction_t *instruction);
+int decode_u_immediate(instruction_t *instruction);
+int decode_j_immediate(instruction_t *instruction);

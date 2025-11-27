@@ -95,7 +95,7 @@ struct Stat simulate(struct memory *mem, int start_addr, FILE *log_file,
     case OP_JAL:
       write_register(&registers, op->args.J.rd, registers.named.pc + 4);
       registers.named.pc += (op->args.J.imm20 << 1);
-      printf("jumping to %8x (%i)\n", registers.named.pc + 4,
+      printf("OP_JAL:\tjumping to %8x (%i)\n", registers.named.pc + 4,
              (op->args.J.imm20 << 1));
       break;
 
@@ -104,9 +104,9 @@ struct Stat simulate(struct memory *mem, int start_addr, FILE *log_file,
       read_register(&registers, op->args.I.rs1, &addr_start);
       int addr =
           (addr_start + op->args.I.imm12) & 0b11111111111111111111111111111110;
-      write_register(&registers, op->args.J.rd, registers.named.pc + 4);
+      write_register(&registers, op->args.I.rd, registers.named.pc + 4);
       registers.named.pc = addr;
-      printf("jumping to %8x\n", addr);
+      printf("OP_JALR:\tjumping to %8x\n", addr);
       break;
     }
 
@@ -115,10 +115,13 @@ struct Stat simulate(struct memory *mem, int start_addr, FILE *log_file,
       read_register(&registers, op->args.S.rs1, &rs1);
       int rs2;
       read_register(&registers, op->args.S.rs2, &rs2);
-      if (rs1 == rs2) {
-        registers.named.pc += (op->args.S.imm31 << 1);
-        printf("branching to %8x (%i)\n", registers.named.pc + 4,
-               (op->args.S.imm31 << 1));
+      int mux = op->args.S.funct3;
+
+      // TODO: decode B-Immediate
+      assert(0);
+
+      if ((mux == 0 && rs1 == rs2) || (mux == 1 && rs1 != rs2)) {
+        // branch by adding b-immediate to pc
       }
       break;
     }
@@ -126,8 +129,10 @@ struct Stat simulate(struct memory *mem, int start_addr, FILE *log_file,
     case OP_LW: {
       int addr_start;
       read_register(&registers, op->args.I.rs1, &addr_start);
+      printf("OP_LW: imm12: %i\n", op->args.I.imm12);
       int memory_addr = addr_start + op->args.I.imm12;
       int word = memory_read_word(mem, memory_addr);
+      printf("OP_LW:\tLoading %i from %8x\n", word, memory_addr);
       write_register(&registers, op->args.I.rd, word);
       break;
     }
@@ -138,6 +143,7 @@ struct Stat simulate(struct memory *mem, int start_addr, FILE *log_file,
       int memory_addr = addr_start + op->args.S.imm11;
       int value;
       read_register(&registers, op->args.S.rs2, &value);
+      printf("OP_SW:\tStoring %i in %8x\n", value, memory_addr);
       memory_write_word(mem, memory_addr, value);
       break;
     }
