@@ -15,10 +15,14 @@
 
 #define debug 1
 
+#define DEBUG(...)                                                             \
+  if (debug)                                                                   \
+  printf(__VA_ARGS__)
+
 void unknown_instruction(instruction_t *op) {
-  printf("Unknown instruction with opcode: %i, ", op->opcode);
-  printf(BYTE_TO_BINARY_PATTERN, BYTE_TO_BINARY(op->opcode));
-  printf("\ninstruction: 0x%08x\n", *(unsigned int *)op);
+  fprintf(stderr, "Unknown instruction with opcode: %i, ", op->opcode);
+  fprintf(stderr, BYTE_TO_BINARY_PATTERN, BYTE_TO_BINARY(op->opcode));
+  fprintf(stderr, "\ninstruction: 0x%08x\n", *(unsigned int *)op);
 }
 
 int write_register(registers_t *registers, int register_idx, int value) {
@@ -55,9 +59,7 @@ int read_register(const registers_t *registers, int register_idx, int *out) {
 
   *out = registers->unnamed[register_idx];
 
-  if (debug) {
-    printf("%i\n", *out);
-  }
+  DEBUG("%i\n", *out);
 
   return 0;
 }
@@ -73,8 +75,8 @@ struct Stat simulate(struct memory *mem, int start_addr, FILE *log_file,
     int m = memory_read_word(mem, registers.named.pc);
     instruction_t *op = (instruction_t *)&m;
 
-    if (debug)
-      printf("pc: %8x\n", registers.named.pc);
+    DEBUG("pc: %8x\n", registers.named.pc);
+    DEBUG("op: %08x\n", *(unsigned int *)op);
 
     switch (op->opcode) {
 
@@ -94,19 +96,21 @@ struct Stat simulate(struct memory *mem, int start_addr, FILE *log_file,
 
     case OP_JAL:
       write_register(&registers, op->args.J.rd, registers.named.pc + 4);
-      registers.named.pc += (op->args.J.imm20 << 1);
-      printf("OP_JAL:\tjumping to %8x (%i)\n", registers.named.pc + 4,
-             (op->args.J.imm20 << 1));
+      int j_imm = op->args.J.imm20 << 1;
+      registers.named.pc += j_imm;
+      DEBUG("OP_JAL:\tjumping to %8x (%i)\n", registers.named.pc + 4, j_imm);
+      continue;
       break;
 
     case OP_JALR: {
       int addr_start;
       read_register(&registers, op->args.I.rs1, &addr_start);
-      int addr =
-          (addr_start + op->args.I.imm12) & 0b11111111111111111111111111111110;
+      int j_imm = decode_j_immediate(op);
+      int addr = (addr_start + j_imm);
       write_register(&registers, op->args.I.rd, registers.named.pc + 4);
       registers.named.pc = addr;
-      printf("OP_JALR:\tjumping to %8x\n", addr);
+      DEBUG("OP_JALR:\tjumping to %8x\n", addr);
+      continue;
       break;
     }
 
@@ -116,12 +120,27 @@ struct Stat simulate(struct memory *mem, int start_addr, FILE *log_file,
       int rs2;
       read_register(&registers, op->args.S.rs2, &rs2);
       int mux = op->args.S.funct3;
+      DEBUG("funct3: %i\n", mux);
 
-      // TODO: decode B-Immediate
-      assert(0);
+      int b_immediate = decode_b_immediate(op);
+      DEBUG("imm12: %i\n", b_immediate);
 
-      if ((mux == 0 && rs1 == rs2) || (mux == 1 && rs1 != rs2)) {
-        // branch by adding b-immediate to pc
+      int condition = 0;
+
+      switch (op->args.S.funct3) {
+      case 0: // BEQ
+        condition = rs1 == rs2;
+        break;
+      case 1: // BNE
+        condition = rs1 != rs2;
+        break;
+      default:
+        fprintf(stderr, "Unknown branch funct3: %i\n", op->args.S.funct3);
+        assert(0);
+      }
+
+      if (condition) {
+        registers.named.pc += b_immediate;
       }
       break;
     }
@@ -129,10 +148,27 @@ struct Stat simulate(struct memory *mem, int start_addr, FILE *log_file,
     case OP_LW: {
       int addr_start;
       read_register(&registers, op->args.I.rs1, &addr_start);
-      printf("OP_LW: imm12: %i\n", op->args.I.imm12);
+      DEBUG("OP_LW: imm12: %i\n", op->args.I.imm12);
       int memory_addr = addr_start + op->args.I.imm12;
-      int word = memory_read_word(mem, memory_addr);
-      printf("OP_LW:\tLoading %i from %8x\n", word, memory_addr);
+
+      int word;
+      switch (op->args.I.funct3) {
+      case 2: {
+        word = memory_read_word(mem, memory_addr);
+        break;
+      }
+      case 4: {
+        word = memory_read_byte(mem, memory_addr);
+        break;
+      }
+      default:
+        fprintf(stderr, "LW Unknown funct3: %i\n", op->args.I.funct3);
+        assert(0);
+        break;
+      }
+
+      DEBUG("OP_LW:\tLoading %i from %8x\n", word, memory_addr);
+
       write_register(&registers, op->args.I.rd, word);
       break;
     }
@@ -140,17 +176,36 @@ struct Stat simulate(struct memory *mem, int start_addr, FILE *log_file,
     case OP_SW: {
       int addr_start;
       read_register(&registers, op->args.S.rs1, &addr_start);
-      int memory_addr = addr_start + op->args.S.imm11;
+      int imm12 = decode_s_immediate(op);
+      int memory_addr = addr_start + imm12;
       int value;
       read_register(&registers, op->args.S.rs2, &value);
-      printf("OP_SW:\tStoring %i in %8x\n", value, memory_addr);
+      DEBUG("OP_SW:\tStoring %i in %8x\n", value, memory_addr);
       memory_write_word(mem, memory_addr, value);
       break;
     }
 
     case OP_ECALL: {
-      // yah mate idfk
-      // TODO: Implement syscalls
+      // Register A7 contains the type of syscall
+      DEBUG("Executing ecall: %i\n", registers.named.a7);
+      switch (registers.named.a7) {
+      case 1:
+        registers.named.a0 = getchar();
+        break;
+      case 2:
+        DEBUG("value of A0: %i\n", registers.named.a0);
+        putchar(registers.named.a0);
+        break;
+      case 3:
+      case 93:
+        run = 0;
+        break;
+      default:
+        fprintf(stderr, "Unknown syscall: %i\n", registers.named.a7);
+        assert(0);
+        break;
+      }
+      break;
     }
 
     default:
