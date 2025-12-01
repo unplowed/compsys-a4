@@ -76,7 +76,7 @@ void disassemble(uint32_t addr, uint32_t instruction, char *result,
   case OP_SW: {
     int rs1 = extract_bits_instruction(&op, 19, 15);
     int rs2 = extract_bits_instruction(&op, 24, 20);
-    snprintf(result, buf_size, "sw %s %i(%s)", register_names[rs2],
+    snprintf(result, buf_size, "sw %s, %i(%s)", register_names[rs2],
              decode_s_immediate_sign_extended(&op), register_names[rs1]);
     break;
   }

@@ -86,6 +86,9 @@ struct Stat simulate(struct memory *mem, int start_addr, FILE *log_file,
     }
 
     switch (simulate_single(mem, &registers, log_file, op)) {
+    case 1: // end simulation
+      run = 0;
+      break;
     case -1: // Unknown instruction
       unknown_instruction(op);
       assert(0);
@@ -346,6 +349,66 @@ int simulate_single(struct memory *mem, registers_t *registers, FILE *log_file,
 
     DEBUG("Jumping to %i\n", target_addr);
     registers->named.pc = target_addr;
+    break;
+  }
+
+  case OP_BEQ: {
+    int rs1 = extract_bits_instruction(op, 19, 15);
+    int rs2 = extract_bits_instruction(op, 24, 20);
+    int imm12 = decode_b_immediate_sign_extended(op);
+    read_register(registers, rs1, &rs1);
+    read_register(registers, rs2, &rs2);
+
+    DEBUG("imm: %i\n", imm12);
+
+    int funct3 = extract_bits_instruction(op, 14, 12);
+    switch (funct3) {
+
+    // beq
+    case 0: {
+      if (rs1 == rs2) {
+        registers->named.pc += imm12;
+        DEBUG("branching to %i\n", registers->named.pc);
+      }
+      break;
+    }
+
+    // bne
+    case 1: {
+      if (rs1 != rs2) {
+        registers->named.pc += imm12;
+        DEBUG("branching to %i\n", registers->named.pc);
+      }
+      break;
+    }
+
+    default:
+      DEBUG("Unknown funct3 %i\n", funct3);
+      return -1;
+    };
+    break;
+  }
+
+  case OP_ECALL: {
+    switch (registers->named.a7) {
+    case 1:
+      registers->named.a0 = getchar();
+      break;
+
+    case 2:
+      putchar(registers->named.a0);
+      break;
+
+    case 3:
+    case 93:
+      return 1;
+      break;
+
+    default:
+      fprintf(stderr, "Unknown ecall %i\n", registers->named.a7);
+      return -1;
+      break;
+    }
     break;
   }
 
