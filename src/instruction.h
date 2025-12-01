@@ -1,8 +1,11 @@
+#pragma once
 typedef enum opcode {
   // Add upper immediate to PC
   OP_AUIPC = 0b0010111,
   // ADDI adds the sign-extended 12-bit immediate to register rs1
   OP_ADDI = 0b0010011,
+  // ADD performs the addition of rs1 and rs2
+  OP_ADD = 0b0110011,
   // Load Upper Immediate
   OP_LUI = 0b0110111,
   // jump and link
@@ -19,60 +22,25 @@ typedef enum opcode {
   OP_ECALL = 0b1110011,
 } opcode_t;
 
-typedef union __attribute__((packed)) instruction_args {
-  struct __attribute__((packed)) r_type {
-    opcode_t opcode : 7;
-    unsigned int rd : 5;
-    unsigned int funct3 : 3;
-    unsigned int rs1 : 5;
-    unsigned int rs2 : 5;
-    unsigned int funct7 : 7;
-  } R;
-  struct __attribute__((packed)) i_type {
-    opcode_t opcode : 7;
-    unsigned int rd : 5;
-    unsigned int funct3 : 3;
-    unsigned int rs1 : 5;
-    int imm12 : 12;
-  } I;
-  struct __attribute__((packed)) s_type {
-    opcode_t opcode : 7;
-    int imm5 : 5;
-    unsigned int funct3 : 3;
-    unsigned int rs1 : 5;
-    unsigned int rs2 : 5;
-    int imm7 : 7;
-  } S;
-  struct __attribute__((packed)) b_type {
-    opcode_t opcode : 7;
-    unsigned int imm7 : 1;
-    unsigned int imm11 : 4;
-    unsigned int funct3 : 3;
-    unsigned int rs1 : 5;
-    unsigned int rs2 : 5;
-    unsigned int imm12 : 6;
-    unsigned imm31 : 1;
-  } B;
-  struct __attribute__((packed)) u_type {
-    opcode_t opcode : 7;
-    unsigned int rd : 5;
-    int imm20 : 20;
-  } U;
-  struct __attribute__((packed)) j_type {
-    opcode_t opcode : 7;
-    unsigned int rd : 5;
-    int imm11 : 9;
-    int imm20 : 11;
-  } J;
-} instruction_args_t;
-
 typedef union __attribute__((packed)) instruction {
   opcode_t opcode : 7;
-  instruction_args_t args;
+  int args;
 } instruction_t;
 
+// Extracts the bits [end:start]
+int extract_bits(int number, int end, int start);
+int extract_bits_instruction(instruction_t *instruction, int end, int start);
+
+// Sign extends a number of a given length.
+int sign_extend(unsigned int number, int length);
+
 int decode_i_immediate(instruction_t *instruction);
+int decode_i_immediate_sign_extended(instruction_t *instruction);
 int decode_s_immediate(instruction_t *instruction);
+int decode_s_immediate_sign_extended(instruction_t *instruction);
 int decode_b_immediate(instruction_t *instruction);
+int decode_b_immediate_sign_extended(instruction_t *instruction);
 int decode_u_immediate(instruction_t *instruction);
+int decode_u_immediate_sign_extended(instruction_t *instruction);
 int decode_j_immediate(instruction_t *instruction);
+int decode_j_immediate_sign_extended(instruction_t *instruction);

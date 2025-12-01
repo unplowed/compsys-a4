@@ -1,5 +1,6 @@
 #include <stddef.h>
 #include <stdint.h>
+#include "instruction.h"
 
 // NOTE: Use of symbols provide for nicer disassembly, but is not required for A4.
 // Feel free to remove this parameter or pass in a NULL pointer and ignore it.
