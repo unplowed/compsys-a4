@@ -29,7 +29,7 @@ int extract_bits_instruction(instruction_t *instruction, int end, int start) {
 int sign_extend(unsigned int number, int length) {
   int ret = number;
 
-  if (number & ((2 << length) - (2 << (length - 1)))) {
+  if (number & ((1 << length) - (1 << (length - 1)))) {
     ret |= 0b1111111111111111111111111111111 << length;
   }
 
@@ -45,7 +45,7 @@ int decode_i_immediate(instruction_t *instruction) {
 int decode_i_immediate_sign_extended(instruction_t *instruction) {
   int intstruction = *(int *)instruction;
 
-  // Extracting bits using (int32 >> i) & ((2 << n) - 1)
+  // Extracting bits using (int32 >> i) & ((1 << n) - 1)
   // where i is the lowest bit in the sequence to be extracted and
   // n is the length of the sequence.
 
@@ -76,9 +76,9 @@ int decode_b_immediate_sign_extended(instruction_t *instruction) {
   int intstruction = *(int *)instruction;
 
   // bits [11:8]
-  unsigned int imm4 = (intstruction >> 8) & ((2 << 4) - 1);
+  unsigned int imm4 = (intstruction >> 8) & ((1 << 4) - 1);
   // bits [30:25]
-  unsigned int imm6 = (intstruction >> 25) & ((2 << 6) - 1);
+  unsigned int imm6 = (intstruction >> 25) & ((1 << 6) - 1);
   // bit [7]
   unsigned int imm1 = (intstruction >> 7) & 0x1;
   unsigned int imm12 = (imm1 << 11) | (imm6 << 5) | imm4 << 1;
@@ -100,19 +100,19 @@ int decode_u_immediate(instruction_t *instruction) {
 int decode_j_immediate_sign_extended(instruction_t *instruction) {
   int intstruction = *(int *)instruction;
 
-  // Extracting bits using (int32 >> i) & ((2 << n) - 1)
+  // Extracting bits using (int32 >> i) & ((1 << n) - 1)
   // where i is the lowest bit in the sequence to be extracted and
   // n is the length of the sequence.
 
   // bits [24:21[
-  unsigned int imm4 = (intstruction >> 21) & ((2 << 4) - 1);
+  unsigned int imm4 = (intstruction >> 21) & ((1 << 4) - 1);
   // bits [30:25[
-  unsigned int imm6 = (intstruction >> 25) & ((2 << 6) - 1);
+  unsigned int imm6 = (intstruction >> 25) & ((1 << 6) - 1);
   // bit [20]
   unsigned int imm1 = (intstruction >> 20) & 0x1;
   // bits [19:12[
-  unsigned int imm8 = (intstruction >> 12) & ((2 << 8) - 1);
-  unsigned int imm20 = (imm8 << 11) | (imm1 << 10) | (imm6 << 4) | imm4;
+  unsigned int imm8 = (intstruction >> 12) & ((1 << 8) - 1);
+  unsigned int imm20 = (imm8 << 12) | (imm1 << 11) | (imm6 << 5) | imm4 << 1;
 
   if (intstruction >> 31) { // 31st bit set
     // sign extend top 12 bits

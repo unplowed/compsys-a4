@@ -76,8 +76,21 @@ void disassemble(uint32_t addr, uint32_t instruction, char *result,
   case OP_SW: {
     int rs1 = extract_bits_instruction(&op, 19, 15);
     int rs2 = extract_bits_instruction(&op, 24, 20);
-    snprintf(result, buf_size, "sw %s, %i(%s)", register_names[rs2],
-             decode_s_immediate_sign_extended(&op), register_names[rs1]);
+    int funct3 = extract_bits_instruction(&op, 14, 12);
+    switch (funct3) {
+    // sb
+    case 0: {
+      snprintf(result, buf_size, "sb %s, %i(%s)", register_names[rs2],
+               decode_s_immediate_sign_extended(&op), register_names[rs1]);
+      break;
+    }
+    // sw
+    case 2: {
+      snprintf(result, buf_size, "sw %s, %i(%s)", register_names[rs2],
+               decode_s_immediate_sign_extended(&op), register_names[rs1]);
+      break;
+    }
+    }
     break;
   }
 
@@ -118,7 +131,7 @@ void disassemble(uint32_t addr, uint32_t instruction, char *result,
   case OP_JAL: {
     int rd = extract_bits_instruction(&op, 11, 7);
     snprintf(result, buf_size, "jal %s, %i", register_names[rd],
-             decode_j_immediate_sign_extended(&op) << 1);
+             decode_j_immediate_sign_extended(&op));
     break;
   }
 

@@ -15,9 +15,11 @@
 
 #define debug 1
 
+FILE *file;
+
 #define DEBUG(...)                                                             \
   if (debug)                                                                   \
-  fprintf(stderr, __VA_ARGS__)
+  fprintf(file, __VA_ARGS__)
 
 void unknown_instruction(instruction_t *op) {
   fprintf(stderr, "\x1b[0;33m   ^^^^^   ^^^^^^^^\x1b[0m\n");
@@ -28,7 +30,7 @@ void unknown_instruction(instruction_t *op) {
 
 int write_register(registers_t *registers, int register_idx, int value) {
   if (debug) {
-    DEBUG("writing %i to %i (%s)\n", value, register_idx,
+    DEBUG("writing %i (%x) to %i (%s)\n", value, value, register_idx,
           register_names[register_idx]);
 
     if (register_idx < 0 || register_idx > 31) {
@@ -60,7 +62,7 @@ int read_register(const registers_t *registers, int register_idx, int *out) {
 
   *out = registers->unnamed[register_idx];
 
-  DEBUG("%i\n", *out);
+  DEBUG("%i (%x)\n", *out, *out);
 
   return 0;
 }
@@ -74,6 +76,8 @@ struct Stat simulate(struct memory *mem, int start_addr, FILE *log_file,
 
   struct Stat stats = {0};
 
+  file = log_file;
+
   while (run) {
     unsigned int m = memory_read_word(mem, registers.named.pc);
     instruction_t *op = (instruction_t *)&m;
@@ -85,153 +89,28 @@ struct Stat simulate(struct memory *mem, int start_addr, FILE *log_file,
       fflush(stderr);
     }
 
-    switch (simulate_single(mem, &registers, log_file, op)) {
+    int ret = simulate_single(mem, &registers, log_file, op);
+    switch (ret) {
+    case 0:
+      // all is good
+      break;
     case 1: // end simulation
       run = 0;
+      break;
+    case 5: // continue without incrementing pc
+      stats.instructions++;
+      continue;
       break;
     case -1: // Unknown instruction
       unknown_instruction(op);
       assert(0);
       break;
+    default:
+      fprintf(stderr, "Unknown return type: %i\n", ret);
+      assert(0);
     }
 
     stats.instructions++;
-
-    // switch (op->opcode) {
-    //
-    // case OP_AUIPC:
-    //   write_register(&registers, op->args.U.rd,
-    //                  registers.named.pc + (op->args.U.imm20 << 12));
-    //   break;
-    // case OP_ADDI: {
-    //   int rs1;
-    //   read_register(&registers, op->args.I.rs1, &rs1);
-    //   write_register(&registers, op->args.I.rd, rs1 + op->args.I.imm12);
-    //   break;
-    // }
-    // case OP_LUI:
-    //   write_register(&registers, op->args.U.rd, op->args.U.imm20 << 12);
-    //   break;
-    //
-    // case OP_JAL:
-    //   write_register(&registers, op->args.J.rd, registers.named.pc + 4);
-    //   int j_imm = op->args.J.imm20 << 1;
-    //   registers.named.pc += j_imm;
-    //   DEBUG("OP_JAL:\tjumping to %8x (%i)\n", registers.named.pc + 4, j_imm);
-    //   continue;
-    //   break;
-    //
-    // case OP_JALR: {
-    //   int addr_start;
-    //   read_register(&registers, op->args.I.rs1, &addr_start);
-    //   int j_imm = decode_j_immediate(op);
-    //   int addr = (addr_start + j_imm);
-    //   write_register(&registers, op->args.I.rd, registers.named.pc + 4);
-    //   registers.named.pc = addr;
-    //   DEBUG("OP_JALR:\tjumping to %8x\n", addr);
-    //   continue;
-    //   break;
-    // }
-    //
-    // case OP_BEQ: {
-    //   int rs1;
-    //   read_register(&registers, op->args.S.rs1, &rs1);
-    //   int rs2;
-    //   read_register(&registers, op->args.S.rs2, &rs2);
-    //   int mux = op->args.S.funct3;
-    //   DEBUG("funct3: %i\n", mux);
-    //
-    //   int b_immediate = decode_b_immediate(op);
-    //   DEBUG("imm12: %i\n", b_immediate);
-    //
-    //   int condition = 0;
-    //
-    //   switch (op->args.S.funct3) {
-    //   case 0: // BEQ
-    //     condition = rs1 == rs2;
-    //     break;
-    //   case 1: // BNE
-    //     condition = rs1 != rs2;
-    //     break;
-    //   default:
-    //     fprintf(stderr, "Unknown branch funct3: %i\n", op->args.S.funct3);
-    //     assert(0);
-    //   }
-    //
-    //   if (condition) {
-    //     registers.named.pc += b_immediate;
-    //   }
-    //   break;
-    // }
-    //
-    // case OP_LW: {
-    //   int addr_start;
-    //   read_register(&registers, op->args.I.rs1, &addr_start);
-    //   DEBUG("OP_LW: imm12: %i\n", op->args.I.imm12);
-    //   int memory_addr = addr_start + op->args.I.imm12;
-    //
-    //   int word;
-    //   switch (op->args.I.funct3) {
-    //   case 2: {
-    //     word = memory_read_word(mem, memory_addr);
-    //     break;
-    //   }
-    //   case 4: {
-    //     word = memory_read_byte(mem, memory_addr);
-    //     break;
-    //   }
-    //   default:
-    //     fprintf(stderr, "LW Unknown funct3: %i\n", op->args.I.funct3);
-    //     assert(0);
-    //     break;
-    //   }
-    //
-    //   DEBUG("OP_LW:\tLoading %i from %8x\n", word, memory_addr);
-    //
-    //   write_register(&registers, op->args.I.rd, word);
-    //   break;
-    // }
-    //
-    // case OP_SW: {
-    //   int addr_start;
-    //   read_register(&registers, op->args.S.rs1, &addr_start);
-    //   int imm12 = decode_s_immediate_sign_extended(op);
-    //   int memory_addr = addr_start + imm12;
-    //   int value;
-    //   read_register(&registers, op->args.S.rs2, &value);
-    //   DEBUG("OP_SW:\tStoring %i in %8x\n", value, memory_addr);
-    //   memory_write_word(mem, memory_addr, value);
-    //   break;
-    // }
-    //
-    // case OP_ECALL: {
-    //   // Register A7 contains the type of syscall
-    //   DEBUG("Executing ecall: %i\n", registers.named.a7);
-    //   switch (registers.named.a7) {
-    //   case 1:
-    //     registers.named.a0 = getchar();
-    //     break;
-    //   case 2:
-    //     DEBUG("value of A0: %i\n", registers.named.a0);
-    //     putchar(registers.named.a0);
-    //     break;
-    //   case 3:
-    //   case 93:
-    //     run = 0;
-    //     break;
-    //   default:
-    //     fprintf(stderr, "Unknown syscall: %i\n", registers.named.a7);
-    //     assert(0);
-    //     break;
-    //   }
-    //   break;
-    // }
-    //
-    // default:
-    //   unknown_instruction(op);
-    //   assert(0);
-    //   break;
-    // }
 
     registers.named.pc += 4;
   }
@@ -281,11 +160,11 @@ int simulate_single(struct memory *mem, registers_t *registers, FILE *log_file,
 
   case OP_JAL: {
     int rd = extract_bits_instruction(op, 11, 7);
-    int imm20 = decode_j_immediate_sign_extended(op);
-    int imm = imm20 << 1;
+    int imm = decode_j_immediate_sign_extended(op);
     write_register(registers, rd, registers->named.pc + 4);
     DEBUG("Jumping by %i\n", imm);
     registers->named.pc += imm;
+    return 5;
     break;
   }
 
@@ -299,8 +178,18 @@ int simulate_single(struct memory *mem, registers_t *registers, FILE *log_file,
     read_register(registers, rs2, &rs2_value);
 
     DEBUG("imm: %i\n", imm);
-    DEBUG("Writing %8x to %00008x\n", rs2_value, addr_start + imm);
-    memory_write_word(mem, addr_start + imm, rs2_value);
+
+    int funct3 = extract_bits_instruction(op, 14, 12);
+    switch (funct3) {
+    case 0:
+      DEBUG("Writing %2x to %8x\n", rs2_value, addr_start + imm);
+      memory_write_byte(mem, addr_start + imm, rs2_value);
+      break;
+    case 2: // sw
+      DEBUG("Writing %8x to %8x\n", rs2_value, addr_start + imm);
+      memory_write_word(mem, addr_start + imm, rs2_value);
+      break;
+    }
     break;
   }
 
@@ -316,14 +205,14 @@ int simulate_single(struct memory *mem, registers_t *registers, FILE *log_file,
     // lw
     case 2: {
       int word = memory_read_word(mem, addr_start + imm);
-      DEBUG("Read %8x from %00008x\n", word, addr_start + imm);
+      DEBUG("Read %8x from %8x\n", word, addr_start + imm);
       write_register(registers, rd, word);
       break;
     }
     // lbu
     case 4: {
       int word = memory_read_byte(mem, addr_start + imm);
-      DEBUG("Read %2x from %00008x\n", word, addr_start + imm);
+      DEBUG("Read %2x from %8x\n", word, addr_start + imm);
       write_register(registers, rd, word);
       break;
     }
@@ -349,6 +238,7 @@ int simulate_single(struct memory *mem, registers_t *registers, FILE *log_file,
 
     DEBUG("Jumping to %i\n", target_addr);
     registers->named.pc = target_addr;
+    return 5;
     break;
   }
 
@@ -369,6 +259,7 @@ int simulate_single(struct memory *mem, registers_t *registers, FILE *log_file,
       if (rs1 == rs2) {
         registers->named.pc += imm12;
         DEBUG("branching to %i\n", registers->named.pc);
+        return 5;
       }
       break;
     }
@@ -378,6 +269,7 @@ int simulate_single(struct memory *mem, registers_t *registers, FILE *log_file,
       if (rs1 != rs2) {
         registers->named.pc += imm12;
         DEBUG("branching to %i\n", registers->named.pc);
+        return 5;
       }
       break;
     }
@@ -396,6 +288,8 @@ int simulate_single(struct memory *mem, registers_t *registers, FILE *log_file,
       break;
 
     case 2:
+      fprintf(log_file, "put char: %c (%x)\n", registers->named.a0,
+              registers->named.a0);
       putchar(registers->named.a0);
       break;
 
