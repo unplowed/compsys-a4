@@ -21,6 +21,10 @@ FILE *file;
   if (debug && file != NULL)                                                   \
   fprintf(file, __VA_ARGS__)
 
+#define END_SIMULATION 1
+#define JUMP_WITHOUT_PC_INCREMENT 5
+#define UNKNOWN_INSTRUCTION -1
+
 void unknown_instruction(instruction_t *op) {
   DEBUG("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n");
   DEBUG("Error occured here!\n");
@@ -97,14 +101,14 @@ struct Stat simulate(struct memory *mem, int start_addr, FILE *log_file,
     case 0:
       // all is good
       break;
-    case 1: // end simulation
+    case END_SIMULATION: // end simulation
       run = 0;
       break;
-    case 5: // continue without incrementing pc
+    case JUMP_WITHOUT_PC_INCREMENT: // continue without incrementing pc
       stats.instructions++;
       continue;
       break;
-    case -1: // Unknown instruction
+    case UNKNOWN_INSTRUCTION: // Unknown instruction
       unknown_instruction(op);
       assert(0);
       break;
@@ -164,7 +168,7 @@ int simulate_single(struct memory *mem, registers_t *registers, FILE *log_file,
     }
     default:
       DEBUG("in addi: Unknown funct3 %i\n", funct3);
-      return -1;
+      return UNKNOWN_INSTRUCTION;
     };
     break;
   }
@@ -183,7 +187,7 @@ int simulate_single(struct memory *mem, registers_t *registers, FILE *log_file,
     write_register(registers, rd, registers->named.pc + 4);
     DEBUG("Jumping by %i\n", imm);
     registers->named.pc += imm;
-    return 5;
+    return JUMP_WITHOUT_PC_INCREMENT;
     break;
   }
 
@@ -237,7 +241,7 @@ int simulate_single(struct memory *mem, registers_t *registers, FILE *log_file,
     }
     default:
       DEBUG("in lw: Unknown funct3 %i\n", funct3);
-      return -1;
+      return UNKNOWN_INSTRUCTION;
     };
     break;
   }
@@ -257,7 +261,7 @@ int simulate_single(struct memory *mem, registers_t *registers, FILE *log_file,
 
     DEBUG("Jumping to %i\n", target_addr);
     registers->named.pc = target_addr;
-    return 5;
+    return JUMP_WITHOUT_PC_INCREMENT;
     break;
   }
 
@@ -349,7 +353,7 @@ int simulate_single(struct memory *mem, registers_t *registers, FILE *log_file,
 
     default:
       DEBUG("in beq: Unknown funct3 %i\n", funct3);
-      return -1;
+      return UNKNOWN_INSTRUCTION;
     };
     break;
   }
@@ -367,19 +371,19 @@ int simulate_single(struct memory *mem, registers_t *registers, FILE *log_file,
 
     case 3:
     case 93:
-      return 1;
+      return END_SIMULATION;
       break;
 
     default:
       DEBUG("Unknown ecall %i\n", registers->named.a7);
-      return -1;
+      return UNKNOWN_INSTRUCTION;
       break;
     }
     break;
   }
 
   default: // Unknown or unimplemented instruction
-    return -1;
+    return UNKNOWN_INSTRUCTION;
     break;
   }
 
