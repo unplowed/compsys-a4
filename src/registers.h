@@ -113,4 +113,4 @@ static const char* register_names[] = {
 // Writes `value` to the given register. Returns non-zero on error
 int write_register(registers_t* registers, int register_idx, int value);
 // Reads the value of the given register into `out`. Returns non-zero on error
-int read_register(const registers_t* registers, int register_idx, int* out);
+int read_register(const registers_t* registers, int register_idx, void* out);

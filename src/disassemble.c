@@ -146,23 +146,50 @@ void disassemble(uint32_t addr, uint32_t instruction, char *result,
   }
 
   case OP_BEQ: {
+    int rs1 = extract_bits_instruction(&op, 19, 15);
+    int rs2 = extract_bits_instruction(&op, 24, 20);
     int funct3 = extract_bits_instruction(&op, 14, 12);
     switch (funct3) {
     // BEQ
     case 0: {
-      int rs1 = extract_bits_instruction(&op, 19, 15);
-      int rs2 = extract_bits_instruction(&op, 24, 20);
       snprintf(result, buf_size, "beq %s, %s, %i", register_names[rs1],
                register_names[rs2], decode_b_immediate_sign_extended(&op));
       break;
     }
     // BNE
     case 1: {
-      int rs1 = extract_bits_instruction(&op, 19, 15);
-      int rs2 = extract_bits_instruction(&op, 24, 20);
       snprintf(result, buf_size, "bne %s, %s, %i", register_names[rs1],
                register_names[rs2], decode_b_immediate_sign_extended(&op));
       break;
+    }
+    // BLT
+    case 4: {
+      snprintf(result, buf_size, "blt %s, %s, %i", register_names[rs1],
+               register_names[rs2], decode_b_immediate_sign_extended(&op));
+      break;
+    }
+    // BGE
+    case 5: {
+      snprintf(result, buf_size, "bge %s, %s, %i", register_names[rs1],
+               register_names[rs2], decode_b_immediate_sign_extended(&op));
+      break;
+    }
+    // BLTU
+    case 6: {
+      snprintf(result, buf_size, "bltu %s, %s, %i", register_names[rs1],
+               register_names[rs2], decode_b_immediate_sign_extended(&op));
+      break;
+    }
+
+    // BGEU
+    case 7: {
+      snprintf(result, buf_size, "bgeu %s, %s, %i", register_names[rs1],
+               register_names[rs2], decode_b_immediate_sign_extended(&op));
+      break;
+    }
+
+    default: {
+      snprintf(result, buf_size, "beq: unknown funct3");
     }
     }
     break;

@@ -18,14 +18,16 @@
 FILE *file;
 
 #define DEBUG(...)                                                             \
-  if (debug)                                                                   \
+  if (debug && file != NULL)                                                   \
   fprintf(file, __VA_ARGS__)
 
 void unknown_instruction(instruction_t *op) {
-  fprintf(stderr, "\x1b[0;33m   ^^^^^   ^^^^^^^^\x1b[0m\n");
+  DEBUG("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n");
+  DEBUG("Error occured here!\n");
   fprintf(stderr,
           "\x1b[0;31mError:\x1b[0m Unknown instruction with opcode %i\n\n",
           op->opcode);
+  fflush(NULL); // flush all streams before exit
 }
 
 int write_register(registers_t *registers, int register_idx, int value) {
@@ -49,7 +51,7 @@ int write_register(registers_t *registers, int register_idx, int value) {
   return 0;
 }
 
-int read_register(const registers_t *registers, int register_idx, int *out) {
+int read_register(const registers_t *registers, int register_idx, void *out) {
   if (debug) {
     DEBUG("reading register %i (%s): ", register_idx,
           register_names[register_idx]);
@@ -60,9 +62,10 @@ int read_register(const registers_t *registers, int register_idx, int *out) {
     }
   }
 
-  *out = registers->unnamed[register_idx];
+  // *out = registers->unnamed[register_idx];
+  memcpy(out, &registers->unnamed[register_idx], sizeof(int));
 
-  DEBUG("%i (%x)\n", *out, *out);
+  DEBUG("%i (%x)\n", (int)out, (int)out);
 
   return 0;
 }
@@ -106,7 +109,7 @@ struct Stat simulate(struct memory *mem, int start_addr, FILE *log_file,
       assert(0);
       break;
     default:
-      fprintf(stderr, "Unknown return type: %i\n", ret);
+      DEBUG("simulator returned unknown return type: %i\n", ret);
       assert(0);
     }
 
@@ -129,22 +132,38 @@ int simulate_single(struct memory *mem, registers_t *registers, FILE *log_file,
     break;
   }
 
+  case OP_ADD: {
+    int rd = extract_bits_instruction(op, 11, 7);
+    int rs1 = extract_bits_instruction(op, 19, 15);
+    int rs2 = extract_bits_instruction(op, 24, 20);
+    read_register(registers, rs1, &rs1);
+    read_register(registers, rs2, &rs2);
+
+    write_register(registers, rd, rs1 + rs2);
+    break;
+  }
+
   case OP_ADDI: {
+    int imm12 = decode_i_immediate(op);
+    int imm = sign_extend(imm12, 12);
+    int rd = extract_bits_instruction(op, 11, 7);
+    int rs1 = extract_bits_instruction(op, 19, 15);
+    int rs1_value;
+    read_register(registers, rs1, &rs1_value);
     int funct3 = extract_bits_instruction(op, 14, 12);
     switch (funct3) {
     // addi
     case 0: {
-      int imm12 = decode_i_immediate(op);
-      int imm = sign_extend(imm12, 12);
-      int rd = extract_bits_instruction(op, 11, 7);
-      int rs1 = extract_bits_instruction(op, 19, 15);
-      int rs1_value;
-      read_register(registers, rs1, &rs1_value);
       write_register(registers, rd, rs1_value + imm);
       break;
     }
+    // andi
+    case 7: {
+      write_register(registers, rd, rs1_value & imm);
+      break;
+    }
     default:
-      DEBUG("Unknown funct3 %i\n", funct3);
+      DEBUG("in addi: Unknown funct3 %i\n", funct3);
       return -1;
     };
     break;
@@ -217,7 +236,7 @@ int simulate_single(struct memory *mem, registers_t *registers, FILE *log_file,
       break;
     }
     default:
-      DEBUG("Unknown funct3 %i\n", funct3);
+      DEBUG("in lw: Unknown funct3 %i\n", funct3);
       return -1;
     };
     break;
@@ -246,8 +265,6 @@ int simulate_single(struct memory *mem, registers_t *registers, FILE *log_file,
     int rs1 = extract_bits_instruction(op, 19, 15);
     int rs2 = extract_bits_instruction(op, 24, 20);
     int imm12 = decode_b_immediate_sign_extended(op);
-    read_register(registers, rs1, &rs1);
-    read_register(registers, rs2, &rs2);
 
     DEBUG("imm: %i\n", imm12);
 
@@ -256,6 +273,8 @@ int simulate_single(struct memory *mem, registers_t *registers, FILE *log_file,
 
     // beq
     case 0: {
+      read_register(registers, rs1, &rs1);
+      read_register(registers, rs2, &rs2);
       if (rs1 == rs2) {
         registers->named.pc += imm12;
         DEBUG("branching to %i\n", registers->named.pc);
@@ -266,6 +285,8 @@ int simulate_single(struct memory *mem, registers_t *registers, FILE *log_file,
 
     // bne
     case 1: {
+      read_register(registers, rs1, &rs1);
+      read_register(registers, rs2, &rs2);
       if (rs1 != rs2) {
         registers->named.pc += imm12;
         DEBUG("branching to %i\n", registers->named.pc);
@@ -274,8 +295,60 @@ int simulate_single(struct memory *mem, registers_t *registers, FILE *log_file,
       break;
     }
 
+    // blt
+    case 4: {
+      read_register(registers, rs1, &rs1);
+      read_register(registers, rs2, &rs2);
+      if (rs1 < rs2) {
+        registers->named.pc += imm12;
+        DEBUG("branching to %i\n", registers->named.pc);
+        return 5;
+      }
+      break;
+    }
+
+    // bge
+    case 5: {
+      read_register(registers, rs1, &rs1);
+      read_register(registers, rs2, &rs2);
+      if (rs1 >= rs2) {
+        registers->named.pc += imm12;
+        DEBUG("branching to %i\n", registers->named.pc);
+        return 5;
+      }
+      break;
+    }
+
+    // bltu
+    case 6: {
+      unsigned int rs1_u;
+      unsigned int rs2_u;
+      read_register(registers, rs1, &rs1_u);
+      read_register(registers, rs2, &rs2_u);
+      if (rs1_u < rs2_u) {
+        registers->named.pc += imm12;
+        DEBUG("branching to %i\n", registers->named.pc);
+        return 5;
+      }
+      break;
+    }
+
+    // bgeu
+    case 7: {
+      unsigned int rs1_u;
+      unsigned int rs2_u;
+      read_register(registers, rs1, &rs1_u);
+      read_register(registers, rs2, &rs2_u);
+      if (rs1_u >= rs2_u) {
+        registers->named.pc += imm12;
+        DEBUG("branching to %i\n", registers->named.pc);
+        return 5;
+      }
+      break;
+    }
+
     default:
-      DEBUG("Unknown funct3 %i\n", funct3);
+      DEBUG("in beq: Unknown funct3 %i\n", funct3);
       return -1;
     };
     break;
@@ -288,8 +361,7 @@ int simulate_single(struct memory *mem, registers_t *registers, FILE *log_file,
       break;
 
     case 2:
-      fprintf(log_file, "put char: %c (%x)\n", registers->named.a0,
-              registers->named.a0);
+      DEBUG("put char: %c (%x)\n", registers->named.a0, registers->named.a0);
       putchar(registers->named.a0);
       break;
 
@@ -299,7 +371,7 @@ int simulate_single(struct memory *mem, registers_t *registers, FILE *log_file,
       break;
 
     default:
-      fprintf(stderr, "Unknown ecall %i\n", registers->named.a7);
+      DEBUG("Unknown ecall %i\n", registers->named.a7);
       return -1;
       break;
     }
