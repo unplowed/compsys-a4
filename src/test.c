@@ -11,7 +11,6 @@ int run_test(const char* tests_name, void *(*init_tests)(), void (*cleanup_tests
 
   for (int i = 0; i < tests_length; i++) {
     test_t test = tests[i];
-    printf("Running test\t\x1b[0;33m%s\x1b[0m: ", test.name);
     fflush(stdout);
 
     // Initialize data
@@ -21,10 +20,10 @@ int run_test(const char* tests_name, void *(*init_tests)(), void (*cleanup_tests
     int ret = test.test(data);
 
     if (ret < 0) {
-      printf("\t\x1b[0;31mFailed!\x1b[0m\n");
+      printf("\x1b[0;31m\x1b[1mx\x1b[1m %s\x1b[0m\n", test.name);
       failed[failed_len++] = i;
     } else {
-      printf("\t\x1b[0;32mSuccess!\x1b[0m\n");
+      printf("\x1b[0;32m✓\x1b[1;90m %s\x1b[0m\n", test.name);
     }
 
     // Cleanup data
@@ -33,11 +32,10 @@ int run_test(const char* tests_name, void *(*init_tests)(), void (*cleanup_tests
   }
 
   if (failed_len) {
-    printf("\x1b[0;31mTests failed!\x1b[0m\nTests ");
+    printf("\n\x1b[0;31m\x1b[1m--- Tests failed! ---\x1b[0m\n");
     for (int i = 0; i < failed_len; i++) {
-      printf("%i, ", failed[i]);
+      printf("\x1b[0;31mx\x1b[0m %s\n", tests[failed[i]].name);
     }
-    printf("failed!\n");
     return -1;
   }
 

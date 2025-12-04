@@ -26,7 +26,9 @@ int disassemble_addi(void *_) {
   return 0;
 }
 
-test_t disassemble_tests[] = {TEST(disassemble_addi)};
+test_t disassemble_tests[] = {
+  TEST(disassemble_addi),
+};
 
 /* ------ DISASSEMBLER TESTS END ----- */
 
