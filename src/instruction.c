@@ -30,7 +30,7 @@ int sign_extend(unsigned int number, int length) {
   int ret = number;
 
   if (number & ((1 << length) - (1 << (length - 1)))) {
-    ret |= 0b1111111111111111111111111111111 << length;
+    ret |= 0xFFFFFF << length;
   }
 
   return ret;
@@ -59,16 +59,20 @@ int decode_i_immediate_sign_extended(instruction_t *instruction) {
   return sign_extend(imm11, 12);
 }
 
+int decode_s_immediate(instruction_t *instruction) {
+  int intstruction = *(int *)instruction;
+  unsigned int imm7 = (intstruction >> 25) & 0x7f;
+  unsigned int imm5 = (intstruction >> 7) & 0x1f;
+  unsigned int imm12 = ((imm7 << 5) | (imm5));
+  return imm12;
+}
+
 int decode_s_immediate_sign_extended(instruction_t *instruction) {
   int intstruction = *(int *)instruction;
-  unsigned int imm7 = (intstruction >> 25) & 0b1111111;
-  unsigned int imm5 = (intstruction >> 7) & 0b11111;
+  unsigned int imm7 = (intstruction >> 25) & 0x7f;
+  unsigned int imm5 = (intstruction >> 7) & 0x1f;
   unsigned int imm12 = ((imm7 << 5) | (imm5));
-  // check sign bit
-  if (imm12 & 0b100000000000) {
-    imm12 |= 0b11111111111111111111100000000000;
-  }
-  return imm12;
+  return sign_extend(imm12, 12);
 }
 
 int decode_b_immediate_sign_extended(instruction_t *instruction) {
@@ -85,7 +89,7 @@ int decode_b_immediate_sign_extended(instruction_t *instruction) {
 
   if (intstruction >> 31) { // 31st bit set
     // sign extend 20 bits
-    imm12 |= 0b11111111111111111111000000000000;
+    imm12 |= 0xfffff000;
   }
 
   return imm12;
@@ -116,7 +120,7 @@ int decode_j_immediate_sign_extended(instruction_t *instruction) {
 
   if (intstruction >> 31) { // 31st bit set
     // sign extend top 12 bits
-    imm20 |= 0b11111111111100000000000000000000;
+    imm20 |= 0xfff00000;
   }
 
   return imm20;

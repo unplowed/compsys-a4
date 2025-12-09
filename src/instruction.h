@@ -1,30 +1,31 @@
 #pragma once
 typedef enum opcode {
   // Add upper immediate to PC
-  OP_AUIPC = 0b0010111,
+  OP_AUIPC = 23,
   // ADDI adds the sign-extended 12-bit immediate to register rs1
-  OP_ADDI = 0b0010011,
+  OP_ADDI = 19,
   // ADD performs the addition of rs1 and rs2
-  OP_ADD = 0b0110011,
+  OP_ADD = 51,
   // Load Upper Immediate
-  OP_LUI = 0b0110111,
+  OP_LUI = 55,
   // jump and link
-  OP_JAL = 0b1101111,
+  OP_JAL = 111,
   // loads a 32-bit value from memory into rd
-  OP_LW = 0b0000011,
+  OP_LW = 3,
   // stores a 32-bit value from the register rs2 to memory.
-  OP_SW = 0b0100011,
+  OP_SW = 35,
   // indirect jump instruction JALR (jump and link register)
-  OP_JALR = 0b1100111,
+  OP_JALR = 103,
   // jumps if rs1 == rs2, otherwise goes to next instruction
-  OP_BEQ = 0b1100011,
+  OP_BEQ = 99,
   // service call to execution environment
-  OP_ECALL = 0b1110011,
+  OP_ECALL = 115,
 } opcode_t;
 
 typedef union __attribute__((packed)) instruction {
   opcode_t opcode : 7;
   int args;
+  unsigned int hex;
 } instruction_t;
 
 // Extracts the bits [end:start]

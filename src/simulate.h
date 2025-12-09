@@ -19,5 +19,5 @@ struct Stat simulate(struct memory *mem, int start_addr, FILE *log_file,
                      struct symbols *symbols);
 
 int simulate_single(struct memory *mem, registers_t *registers, FILE *log_file,
-                    instruction_t *op);
+                    instruction_t op);
 #endif

@@ -2,6 +2,7 @@
 #include "disassemble.h"
 #include "instruction.h"
 #include "memory.h"
+#include "registers.h"
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -35,15 +36,12 @@ void unknown_instruction(instruction_t *op) {
 }
 
 int write_register(registers_t *registers, int register_idx, int value) {
-  if (debug) {
-    DEBUG("writing %i (%x) to %i (%s)\n", value, value, register_idx,
-          register_names[register_idx]);
-
-    if (register_idx < 0 || register_idx > 31) {
-      DEBUG("Out of bounds write!\n");
-      assert(0);
-    }
+  if (register_idx < 0 || register_idx > 31) {
+    return -1;
   }
+
+  DEBUG("writing %i (%x) to %i (%s)\n", value, value, register_idx,
+        register_names[register_idx]);
 
   // ignore writes to zero
   switch (register_idx) {
@@ -56,15 +54,12 @@ int write_register(registers_t *registers, int register_idx, int value) {
 }
 
 int read_register(const registers_t *registers, int register_idx, void *out) {
-  if (debug) {
-    DEBUG("reading register %i (%s): ", register_idx,
-          register_names[register_idx]);
-
-    if (register_idx < 0 || register_idx > 31) {
-      DEBUG("Out of bounds read!\n");
-      assert(0);
-    }
+  if (register_idx < 0 || register_idx > 31) {
+    return -1;
   }
+
+  DEBUG("reading register %i (%s): ", register_idx,
+        register_names[register_idx]);
 
   // *out = registers->unnamed[register_idx];
   memcpy(out, &registers->unnamed[register_idx], sizeof(int));
@@ -96,7 +91,7 @@ struct Stat simulate(struct memory *mem, int start_addr, FILE *log_file,
       fflush(stderr);
     }
 
-    int ret = simulate_single(mem, &registers, log_file, op);
+    int ret = simulate_single(mem, &registers, log_file, *op);
     switch (ret) {
     case 0:
       // all is good
@@ -126,20 +121,20 @@ struct Stat simulate(struct memory *mem, int start_addr, FILE *log_file,
 }
 
 int simulate_single(struct memory *mem, registers_t *registers, FILE *log_file,
-                    instruction_t *op) {
-  switch (op->opcode) {
+                    instruction_t op) {
+  switch (op.opcode) {
 
   case OP_AUIPC: {
-    int imm20 = decode_u_immediate(op);
-    int rd = extract_bits_instruction(op, 11, 7);
+    int imm20 = decode_u_immediate(&op);
+    int rd = extract_bits_instruction(&op, 11, 7);
     write_register(registers, rd, imm20 << 12);
     break;
   }
 
   case OP_ADD: {
-    int rd = extract_bits_instruction(op, 11, 7);
-    int rs1 = extract_bits_instruction(op, 19, 15);
-    int rs2 = extract_bits_instruction(op, 24, 20);
+    int rd = extract_bits_instruction(&op, 11, 7);
+    int rs1 = extract_bits_instruction(&op, 19, 15);
+    int rs2 = extract_bits_instruction(&op, 24, 20);
     read_register(registers, rs1, &rs1);
     read_register(registers, rs2, &rs2);
 
@@ -148,13 +143,13 @@ int simulate_single(struct memory *mem, registers_t *registers, FILE *log_file,
   }
 
   case OP_ADDI: {
-    int imm12 = decode_i_immediate(op);
+    int imm12 = decode_i_immediate(&op);
     int imm = sign_extend(imm12, 12);
-    int rd = extract_bits_instruction(op, 11, 7);
-    int rs1 = extract_bits_instruction(op, 19, 15);
+    int rd = extract_bits_instruction(&op, 11, 7);
+    int rs1 = extract_bits_instruction(&op, 19, 15);
     int rs1_value;
     read_register(registers, rs1, &rs1_value);
-    int funct3 = extract_bits_instruction(op, 14, 12);
+    int funct3 = extract_bits_instruction(&op, 14, 12);
     switch (funct3) {
     // addi
     case 0: {
@@ -174,16 +169,16 @@ int simulate_single(struct memory *mem, registers_t *registers, FILE *log_file,
   }
 
   case OP_LUI: {
-    int rd = extract_bits_instruction(op, 11, 7);
-    int imm12 = extract_bits_instruction(op, 31, 12);
+    int rd = extract_bits_instruction(&op, 11, 7);
+    int imm12 = extract_bits_instruction(&op, 31, 12);
     int imm = imm12 << 12;
     write_register(registers, rd, imm);
     break;
   }
 
   case OP_JAL: {
-    int rd = extract_bits_instruction(op, 11, 7);
-    int imm = decode_j_immediate_sign_extended(op);
+    int rd = extract_bits_instruction(&op, 11, 7);
+    int imm = decode_j_immediate_sign_extended(&op);
     write_register(registers, rd, registers->named.pc + 4);
     DEBUG("Jumping by %i\n", imm);
     registers->named.pc += imm;
@@ -192,9 +187,9 @@ int simulate_single(struct memory *mem, registers_t *registers, FILE *log_file,
   }
 
   case OP_SW: {
-    int rs1 = extract_bits_instruction(op, 19, 15);
-    int rs2 = extract_bits_instruction(op, 24, 20);
-    int imm = decode_s_immediate_sign_extended(op);
+    int rs1 = extract_bits_instruction(&op, 19, 15);
+    int rs2 = extract_bits_instruction(&op, 24, 20);
+    int imm = decode_s_immediate_sign_extended(&op);
     int addr_start;
     read_register(registers, rs1, &addr_start);
     int rs2_value;
@@ -202,7 +197,7 @@ int simulate_single(struct memory *mem, registers_t *registers, FILE *log_file,
 
     DEBUG("imm: %i\n", imm);
 
-    int funct3 = extract_bits_instruction(op, 14, 12);
+    int funct3 = extract_bits_instruction(&op, 14, 12);
     switch (funct3) {
     case 0:
       DEBUG("Writing %2x to %8x\n", rs2_value, addr_start + imm);
@@ -217,10 +212,10 @@ int simulate_single(struct memory *mem, registers_t *registers, FILE *log_file,
   }
 
   case OP_LW: {
-    int funct3 = extract_bits_instruction(op, 14, 12);
-    int rd = extract_bits_instruction(op, 11, 7);
-    int rs1 = extract_bits_instruction(op, 19, 15);
-    int imm = decode_i_immediate(op);
+    int funct3 = extract_bits_instruction(&op, 14, 12);
+    int rd = extract_bits_instruction(&op, 11, 7);
+    int rs1 = extract_bits_instruction(&op, 19, 15);
+    int imm = decode_i_immediate(&op);
     int addr_start;
     read_register(registers, rs1, &addr_start);
     DEBUG("imm: %i\n", imm);
@@ -247,9 +242,9 @@ int simulate_single(struct memory *mem, registers_t *registers, FILE *log_file,
   }
 
   case OP_JALR: {
-    int rd = extract_bits_instruction(op, 11, 7);
-    int rs1 = extract_bits_instruction(op, 19, 15);
-    int imm12 = decode_i_immediate(op);
+    int rd = extract_bits_instruction(&op, 11, 7);
+    int rs1 = extract_bits_instruction(&op, 19, 15);
+    int imm12 = decode_i_immediate(&op);
     int imm = sign_extend(imm12, 12);
     read_register(registers, rs1, &rs1);
 
@@ -266,13 +261,13 @@ int simulate_single(struct memory *mem, registers_t *registers, FILE *log_file,
   }
 
   case OP_BEQ: {
-    int rs1 = extract_bits_instruction(op, 19, 15);
-    int rs2 = extract_bits_instruction(op, 24, 20);
-    int imm12 = decode_b_immediate_sign_extended(op);
+    int rs1 = extract_bits_instruction(&op, 19, 15);
+    int rs2 = extract_bits_instruction(&op, 24, 20);
+    int imm12 = decode_b_immediate_sign_extended(&op);
 
     DEBUG("imm: %i\n", imm12);
 
-    int funct3 = extract_bits_instruction(op, 14, 12);
+    int funct3 = extract_bits_instruction(&op, 14, 12);
     switch (funct3) {
 
     // beq

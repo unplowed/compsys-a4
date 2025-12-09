@@ -16,9 +16,10 @@ zip: ../src.zip
 	cd .. && zip -r src.zip src/Makefile src/*.c src/*.h
 
 test: *.c *.h
-	$(GCC) simulate.c disassemble.c test.c tests.c memory.c read_elf.c instruction.c -o test
+	$(GCC) simulate.c disassemble.c test.c tests.c memory.c read_elf.c instruction.c -O1 -o test
+
+tests: test
 	./test
-	rm ./test
 
 clean:
 	rm -rf *.o sim test vgcore*

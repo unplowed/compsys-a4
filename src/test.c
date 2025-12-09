@@ -34,7 +34,7 @@ int run_test(const char* tests_name, void *(*init_tests)(), void (*cleanup_tests
   if (failed_len) {
     printf("\n\x1b[0;31m\x1b[1m--- Tests failed! ---\x1b[0m\n");
     for (int i = 0; i < failed_len; i++) {
-      printf("\x1b[0;31mx\x1b[0m %s\n", tests[failed[i]].name);
+      printf("\x1b[0;31mx \x1b[0;33m%s:\x1b[0m %s\n", tests_name, tests[failed[i]].name);
     }
     return -1;
   }
