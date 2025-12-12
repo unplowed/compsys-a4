@@ -1,3 +1,4 @@
+#include "branch_prediction.h"
 #include "disassemble.h"
 #include "instruction.h"
 #include "memory.h"
@@ -5,21 +6,6 @@
 #include "test.h"
 #include <stdlib.h>
 #include <time.h>
-
-#define GHR_BITS 8 //GHR = Global History Register
-#define GHR_MASK ((1 << GHR_BITS) -1)
-int unsigned GHR = 0;
-
-static uint8_t* BHT = NULL;
-int BHT_SIZE = 0;
-
-typedef enum {
-    None = 0,
-    NT,
-    BTFNT,
-    Bimodal,
-    gShare
-} predictor_mode;
 
 /* --------- IMMEDIATES TESTS -------- */
 // Runs at the start of every test
@@ -574,9 +560,36 @@ int registers_write(void *raw_data) {
   return 0;
 }
 
+int registers_read_unsigned(void *raw_data) {
+  registers_t *registers = raw_data;
+
+  unsigned int value = 3495345;
+  registers->named.a0 = value;
+  int out;
+  int ret = read_register(registers, 10, &out);
+  ASSERT_EQ(ret, 0);
+  ASSERT_EQ(value, out);
+
+  value = 0;
+  registers->named.a1 = value;
+  ret = read_register(registers, 11, &out);
+  ASSERT_EQ(ret, 0);
+  ASSERT_EQ(value, out);
+
+  // Max value of unsigned integer
+  value = 1 << 31;
+  registers->named.a1 = value;
+  ret = read_register(registers, 11, &out);
+  ASSERT_EQ(ret, 0);
+  ASSERT_EQ(value, out);
+
+  return 0;
+}
+
 test_t registers_tests[] = {
     TEST(registers_read),
     TEST(registers_write),
+    TEST(registers_read_unsigned),
 };
 /* ------- REGISTERS TESTS END ------- */
 
@@ -593,7 +606,10 @@ void *simulate_init() {
 
   return data;
 };
-void simulate_cleanup(void *data) { free(data); };
+void simulate_cleanup(void *data) {
+  memory_delete(((simulate_test_data_t *)data)->memory);
+  free(data);
+};
 
 int simulate_addi(void *raw_data) {
   simulate_test_data_t *data = raw_data;
@@ -637,126 +653,131 @@ test_t simulate_tests[] = {
 };
 /* -------- SIMULATE TESTS END ------- */
 
-
 /* ---------- BRANCH PREDICTION TESTS --------- */
-void branch_prediction_init() {}
 
+void *branch_prediction_init() {
+  branch_prediction_data_t *data = calloc(1, sizeof(branch_prediction_data_t));
 
-void branch_prediction_cleanup(void* data) { free(data); };
+  init_BHT(data, 16);
 
-
-int BHT_test(int size) {
-    uint8_t* BHT = init_BHT(size);
-
-    ASSERT_NEQ(sizeof(BHT), NULL);
-
-    ASSERT_EQ(sizeof(BHT), size)
-
-    for (int i = 0; i < size; i++) {
-        ASSERT_EQ(BHT[i], 1);
-    }
-
-    int offset = 4;
-
-    return 0;
-}
-int BHT_test_256() {
-    return BHT_test(256);
+  return data;
 }
 
-int BHT_test_1k() { //1k
-    return BHT_test(1024);
+void branch_prediction_cleanup(void *raw_data) {
+  branch_prediction_data_t *data = (branch_prediction_data_t *)raw_data;
+
+  if (data->BranchHistoryTable)
+    free(data->BranchHistoryTable);
+
+  free(data);
+};
+
+int BHT_test(void *raw_data, int size) {
+  branch_prediction_data_t *data = (branch_prediction_data_t *)raw_data;
+  init_BHT(data, size);
+
+  for (int i = 0; i < size; i++) {
+    ASSERT_EQ(data->BranchHistoryTable[i], 1)
+  }
+
+  int offset = 4;
+
+  return 0;
 }
 
-int BHT_test_4k() { //4k
-    return BHT_test(4096);
+int BHT_test_256(void *data) { return BHT_test(data, 256); }
+
+int BHT_test_1k(void *data) { // 1k
+  return BHT_test(data, 1024);
 }
 
-int BHT_test_16k() { //16k
-    return BHT_test(16384);
+int BHT_test_4k(void *data) { // 4k
+  return BHT_test(data, 4096);
 }
 
-
-
-int branch_prediction_test_NT() {
-    int pc = 0;
-    int offset = 8;
-    predictor_mode predictor = NT;
-
-    
-    int prediction = branch_prediction(pc, offset, predictor);
-
-    ASSERT_NEQ(predictor, NULL);
-    ASSERT_NEQ(predictor, 0);
-
-    ASSERT_EQ(prediction, pc + 4);
-
+int BHT_test_16k(void *data) { // 16k
+  return BHT_test(data, 16384);
 }
 
-int branch_prediction_test_BTFNT() {
-    int pc = 0;
-    int offset = 8;
-    predictor_mode predictor = BTFNT;
+// what does NT mean? longer descriptive names please
+int branch_prediction_test_NT(void *data) {
+  int pc = 0;
+  int offset = 8;
+  predictor_mode predictor = NT;
 
+  int prediction = branch_prediction(data, pc, offset, predictor);
 
-    int prediction = branch_prediction(pc, offset, predictor);
+  ASSERT_NEQ(predictor, 0);
 
-    ASSERT_NEQ(predictor, NULL);
-    ASSERT_NEQ(predictor, 0);
+  ASSERT_EQ(prediction, pc + 4);
 
-    ASSERT_EQ(prediction, pc + 4);
-
-    offset = -1;
-
-    ASSERT_EQ(prediction, pc + offset);
-
-    return 0;
+  return 0;
 }
 
-int branch_prediction_test_Bimodal() {
-    int pc = 0;
-    int offset = 8;
-    int bimodal_index;
-    predictor_mode predictor = Bimodal;
+// same issue here
+int branch_prediction_test_BTFNT(void *data) {
+  int pc = 0;
+  int offset = 8;
+  predictor_mode predictor = BTFNT;
 
-    BHT[bimodal_index] = 1;
+  int prediction = branch_prediction(data, pc, offset, predictor);
 
+  ASSERT_NEQ(predictor, 0);
 
-    int prediction = branch_prediction(pc, offset, predictor);
+  ASSERT_EQ(prediction, pc + 4);
 
-    ASSERT_NEQ(predictor, NULL);
-    ASSERT_NEQ(predictor, 0);
+  offset = -1;
 
-    ASSERT_EQ(BHT[bimodal_index], 2);
+  ASSERT_EQ(prediction, pc + offset);
 
-    return 0;
+  return 0;
 }
 
-int branch_prediction_test_gShare() {
-    int pc = 0;
-    int offset = 8;
-    int gShare_index;
-    init_BHT(8);
-    GHR = ((GHR << 1) | (offset < 0)) & GHR_MASK;
+int branch_prediction_test_Bimodal(void *raw_data) {
+  int pc = 0;
+  int offset = 8;
+  int bimodal_index;
+  predictor_mode predictor = Bimodal;
+  branch_prediction_data_t *data = (branch_prediction_data_t *)raw_data;
 
-    predictor_mode predictor = gShare;
+  init_BHT(data, 8);
 
-    int prediction = branch_prediction(pc, offset, predictor);
+  data->BranchHistoryTable[bimodal_index] = 1;
 
-    ASSERT_NEQ(predictor, NULL);
-    ASSERT_NEQ(predictor, 0);
+  int prediction = branch_prediction(data, pc, offset, predictor);
 
-    ASSERT_EQ(prediction, pc + 4);
+  ASSERT_NEQ(predictor, 0);
 
-    ASSERT_EQ(BHT[gShare_index], 2);
+  ASSERT_EQ(data->BranchHistoryTable[bimodal_index], 2);
 
-    prediction = branch_prediction(pc, offset, predictor);
-
-    ASSERT_EQ(prediction, pc + offset);
-
-    return 0;
+  return 0;
 }
 
+int branch_prediction_test_gShare(void *raw_data) {
+  int pc = 0;
+  int offset = 8;
+  int gShare_index;
+  branch_prediction_data_t *data = (branch_prediction_data_t *)raw_data;
+  init_BHT(data, 8);
+  data->GlobalHistoryRegister =
+      ((data->GlobalHistoryRegister << 1) | (offset < 0)) & GHR_MASK;
+
+  predictor_mode predictor = gShare;
+
+  int prediction = branch_prediction(data, pc, offset, predictor);
+
+  ASSERT_NEQ(predictor, 0);
+
+  ASSERT_EQ(prediction, pc + 4);
+
+  ASSERT_EQ(data->BranchHistoryTable[gShare_index], 2);
+
+  prediction = branch_prediction(data, pc, offset, predictor);
+
+  ASSERT_EQ(prediction, pc + offset);
+
+  return 0;
+}
 
 test_t branch_prediction_tests[] = {
     TEST(BHT_test_256),
@@ -783,6 +804,7 @@ int main() {
   run_test("Simulate", simulate_init, simulate_cleanup, simulate_tests,
            sizeof(simulate_tests) / sizeof(test_t));
 
-  run_test("Branch Prediction", branch_prediction_init, branch_prediction_cleanup,
-      branch_prediction_tests, sizeof(branch_prediction_tests) / sizeof(test_t));
+  run_test("Branch Prediction", branch_prediction_init,
+           branch_prediction_cleanup, branch_prediction_tests,
+           sizeof(branch_prediction_tests) / sizeof(test_t));
 }

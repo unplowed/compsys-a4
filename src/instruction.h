@@ -22,7 +22,7 @@ typedef enum opcode {
   OP_ECALL = 115,
 } opcode_t;
 
-typedef union __attribute__((packed)) instruction {
+typedef union instruction {
   opcode_t opcode : 7;
   int args;
   unsigned int hex;
