@@ -6,6 +6,21 @@
 #include <stdlib.h>
 #include <time.h>
 
+#define GHR_BITS 8 //GHR = Global History Register
+#define GHR_MASK ((1 << GHR_BITS) -1)
+int unsigned GHR = 0;
+
+static uint8_t* BHT = NULL;
+int BHT_SIZE = 0;
+
+typedef enum {
+    None = 0,
+    NT,
+    BTFNT,
+    Bimodal,
+    gShare
+} predictor_mode;
+
 /* --------- IMMEDIATES TESTS -------- */
 // Runs at the start of every test
 void *immediate_init() { return 0; };
@@ -622,6 +637,139 @@ test_t simulate_tests[] = {
 };
 /* -------- SIMULATE TESTS END ------- */
 
+
+/* ---------- BRANCH PREDICTION TESTS --------- */
+void branch_prediction_init() {}
+
+
+void branch_prediction_cleanup(void* data) { free(data); };
+
+
+int BHT_test(int size) {
+    uint8_t* BHT = init_BHT(size);
+
+    ASSERT_NEQ(sizeof(BHT), NULL);
+
+    ASSERT_EQ(sizeof(BHT), size)
+
+    for (int i = 0; i < size; i++) {
+        ASSERT_EQ(BHT[i], 1);
+    }
+
+    int offset = 4;
+
+    return 0;
+}
+int BHT_test_256() {
+    return BHT_test(256);
+}
+
+int BHT_test_1k() { //1k
+    return BHT_test(1024);
+}
+
+int BHT_test_4k() { //4k
+    return BHT_test(4096);
+}
+
+int BHT_test_16k() { //16k
+    return BHT_test(16384);
+}
+
+
+
+int branch_prediction_test_NT() {
+    int pc = 0;
+    int offset = 8;
+    predictor_mode predictor = NT;
+
+    
+    int prediction = branch_prediction(pc, offset, predictor);
+
+    ASSERT_NEQ(predictor, NULL);
+    ASSERT_NEQ(predictor, 0);
+
+    ASSERT_EQ(prediction, pc + 4);
+
+}
+
+int branch_prediction_test_BTFNT() {
+    int pc = 0;
+    int offset = 8;
+    predictor_mode predictor = BTFNT;
+
+
+    int prediction = branch_prediction(pc, offset, predictor);
+
+    ASSERT_NEQ(predictor, NULL);
+    ASSERT_NEQ(predictor, 0);
+
+    ASSERT_EQ(prediction, pc + 4);
+
+    offset = -1;
+
+    ASSERT_EQ(prediction, pc + offset);
+
+    return 0;
+}
+
+int branch_prediction_test_Bimodal() {
+    int pc = 0;
+    int offset = 8;
+    int bimodal_index;
+    predictor_mode predictor = Bimodal;
+
+    BHT[bimodal_index] = 1;
+
+
+    int prediction = branch_prediction(pc, offset, predictor);
+
+    ASSERT_NEQ(predictor, NULL);
+    ASSERT_NEQ(predictor, 0);
+
+    ASSERT_EQ(BHT[bimodal_index], 2);
+
+    return 0;
+}
+
+int branch_prediction_test_gShare() {
+    int pc = 0;
+    int offset = 8;
+    int gShare_index;
+    init_BHT(8);
+    GHR = ((GHR << 1) | (offset < 0)) & GHR_MASK;
+
+    predictor_mode predictor = gShare;
+
+    int prediction = branch_prediction(pc, offset, predictor);
+
+    ASSERT_NEQ(predictor, NULL);
+    ASSERT_NEQ(predictor, 0);
+
+    ASSERT_EQ(prediction, pc + 4);
+
+    ASSERT_EQ(BHT[gShare_index], 2);
+
+    prediction = branch_prediction(pc, offset, predictor);
+
+    ASSERT_EQ(prediction, pc + offset);
+
+    return 0;
+}
+
+
+test_t branch_prediction_tests[] = {
+    TEST(BHT_test_256),
+    TEST(BHT_test_1k),
+    TEST(BHT_test_4k),
+    TEST(BHT_test_16k),
+    TEST(branch_prediction_test_NT),
+    TEST(branch_prediction_test_BTFNT),
+    TEST(branch_prediction_test_Bimodal),
+    TEST(branch_prediction_test_gShare),
+};
+/* -------- BRANCH PREDICTION TESTS END ------- */
+
 int main() {
   run_test("Immediates", immediate_init, immediate_cleanup, immediate_tests,
            sizeof(immediate_tests) / sizeof(test_t));
@@ -634,4 +782,7 @@ int main() {
 
   run_test("Simulate", simulate_init, simulate_cleanup, simulate_tests,
            sizeof(simulate_tests) / sizeof(test_t));
+
+  run_test("Branch Prediction", branch_prediction_init, branch_prediction_cleanup,
+      branch_prediction_tests, sizeof(branch_prediction_tests) / sizeof(test_t));
 }
