@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 #define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
 #define BYTE_TO_BINARY(byte)                                                   \
@@ -25,6 +26,22 @@ FILE *file;
 #define END_SIMULATION 1
 #define JUMP_WITHOUT_PC_INCREMENT 5
 #define UNKNOWN_INSTRUCTION -1
+
+static uint8_t *BHT = NULL;
+int BHT_SIZE = 0;
+
+#define GHR_BITS 8 //GHR = Global History Register
+#define GHR_MASK ((1 << GHR_BITS) -1)
+
+int unsigned GHR = 0;
+
+typedef enum {
+    None = 0,
+    NT,
+    BTFNT,
+    Bimodal,
+    gShare
+} predictor_mode;
 
 void unknown_instruction(instruction_t *op) {
   DEBUG("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n");
@@ -69,6 +86,86 @@ int read_register(const registers_t *registers, int register_idx, void *out) {
   return 0;
 }
 
+void init_BHT(int size) {
+    BHT_SIZE = size;
+    if (BHT != NULL) {
+        free(BHT);
+    }
+
+    BHT = (uint8_t*)calloc(BHT_SIZE, sizeof(uint8_t));
+    for (int i = 0; i < BHT_SIZE; i++) {
+        BHT[i] = 1; //initialize all bits to 1 (weakly not taken)
+    }
+}
+
+int branch_prediction(int pc, int offset, predictor_mode predictor) {
+
+    int bimodal_index;
+    int bimodal_state;
+    int gShare_index;
+    int counter;
+    int prediction;
+
+    switch (predictor) {
+
+        case NT:
+            return pc + 4; //not taken
+
+        case BTFNT:
+            if (offset < 0) {
+                return pc + offset; //taken
+            } else {
+                return pc + 4; //not taken
+            }
+        case Bimodal:
+            bimodal_index = (pc >> 2) & (BHT_SIZE - 1);
+            bimodal_state = BHT[bimodal_index];
+
+            if (offset < 0) { //taken
+                if (BHT[bimodal_index] < 3) { //not strongly taken
+                    BHT[bimodal_index]++; //move closer to it
+                }
+            } else { //not taken
+                if (BHT[bimodal_index] > 0) { //not stongly not taken
+                    BHT[bimodal_index]--; //move closer to it
+                }
+            }
+
+            if (bimodal_state >= 2) {
+                return pc + offset;
+            } else {
+                return pc + 4;
+            }
+
+        case gShare:
+            gShare_index = ((pc >> 2) ^ GHR) & (BHT_SIZE - 1);
+            counter = BHT[gShare_index];
+            prediction = (counter >= 2); //saved before decrementing / incrementing.
+
+            if (offset < 0) { //taken
+                if (counter < 3) {
+                    counter++;
+                }
+            } else { //not taken
+                if (counter > 0) {
+                    counter--;
+                }
+            }
+
+            BHT[gShare_index] = counter;
+            GHR = ((GHR << 1) | (offset < 0)) & GHR_MASK;
+
+            if (prediction) {
+                return pc + offset; //taken
+            } else {
+                return pc + 4; //not taken
+            }
+
+        default:
+            return pc + 4; //if something goes wrong, don't take anything.
+        }
+}
+
 struct Stat simulate(struct memory *mem, int start_addr, FILE *log_file,
                      struct symbols *symbols) {
   int run = 1;
@@ -90,6 +187,10 @@ struct Stat simulate(struct memory *mem, int start_addr, FILE *log_file,
       DEBUG("%8x : %08X       %s\n", registers.named.pc, m, disassembly);
       fflush(stderr);
     }
+
+    int offset = 8;
+    prediction_branch(registers.named.pc, offset, NT);
+
 
     int ret = simulate_single(mem, &registers, log_file, *op);
     switch (ret) {
