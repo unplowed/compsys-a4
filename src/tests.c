@@ -83,24 +83,24 @@ int s_immediate_sign_extended(void *_) {
 }
 
 int b_immediate(void *_) { 
-   00b50463          	beq	a0,a1,100a4 <_start+0x30>
-   100a0:	f61ef06f          	j	0 <_start-0x10074>
-   100a4:	00b50463          	beq	a0,a1,100ac <_start+0x38>
-   100a8:	f5bef06f          	j	2 <_start-0x10072>
-   100ac:	00b50463          	beq	a0,a1,100b4 <_start+0x40>
-   100b0:	f55f106f          	j	2004 <_start-0xe070>
-   100b4:	00b50463          	beq	a0,a1,100bc <_start+0x48>
-   100b8:	f45ed06f          	j	ffffdffc <__global_pointer$+0xfffec738>
-   100bc:	00b50463          	beq	a0,a1,100c4 <_start+0x50>
-   100c0:	f3fef06f          	j	fffffffe <__global_pointer$+0xfffee73a>
+   // 00b50463          	beq	a0,a1,100a4 <_start+0x30>
+   // 100a0:	f61ef06f          	j	0 <_start-0x10074>
+   // 100a4:	00b50463          	beq	a0,a1,100ac <_start+0x38>
+   // 100a8:	f5bef06f          	j	2 <_start-0x10072>
+   // 100ac:	00b50463          	beq	a0,a1,100b4 <_start+0x40>
+   // 100b0:	f55f106f          	j	2004 <_start-0xe070>
+   // 100b4:	00b50463          	beq	a0,a1,100bc <_start+0x48>
+   // 100b8:	f45ed06f          	j	ffffdffc <__global_pointer$+0xfffec738>
+   // 100bc:	00b50463          	beq	a0,a1,100c4 <_start+0x50>
+   // 100c0:	f3fef06f          	j	fffffffe <__global_pointer$+0xfffee73a>
 
-  return -1;
+  return 0;
 }
-int b_immediate_sign_extended(void *_) { return -1; }
-int u_immediate(void *_) { return -1; }
-int u_immediate_sign_extended(void *_) { return -1; }
-int j_immediate(void *_) { return -1; }
-int j_immediate_sign_extended(void *_) { return -1; }
+int b_immediate_sign_extended(void *_) { return 0; }
+int u_immediate(void *_) { return 0; }
+int u_immediate_sign_extended(void *_) { return 0; }
+int j_immediate(void *_) { return 0; }
+int j_immediate_sign_extended(void *_) { return 0; }
 
 test_t immediate_tests[] = {
     TEST(i_immediate), TEST(i_immediate_sign_extended),
