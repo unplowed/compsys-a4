@@ -18,7 +18,7 @@
 
 #define debug 1
 
-FILE *file;
+FILE* file;
 
 #define DEBUG(...)                                                             \
   if (debug && file != NULL)                                                   \
@@ -28,451 +28,445 @@ FILE *file;
 #define JUMP_WITHOUT_PC_INCREMENT 5
 #define UNKNOWN_INSTRUCTION -1
 
-void unknown_instruction(instruction_t *op) {
-  DEBUG("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n");
-  DEBUG("Error occured here!\n");
-  fprintf(stderr,
-          "\x1b[0;31mError:\x1b[0m Unknown instruction with opcode %i\n\n",
-          op->opcode);
-  fflush(NULL); // flush all streams before exit
+void unknown_instruction(instruction_t* op) {
+    DEBUG("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n");
+    DEBUG("Error occured here!\n");
+    fprintf(stderr,
+        "\x1b[0;31mError:\x1b[0m Unknown instruction with opcode %i\n\n",
+        op->opcode);
+    fflush(NULL); // flush all streams before exit
 }
 
-int write_register(registers_t *registers, int register_idx, int value) {
-  if (register_idx < 0 || register_idx > 31) {
-    return -1;
-  }
+int write_register(registers_t* registers, int register_idx, int value) {
+    if (register_idx < 0 || register_idx > 31) {
+        return -1;
+    }
 
-  DEBUG("writing %i (%x) to %i (%s)\n", value, value, register_idx,
+    DEBUG("writing %i (%x) to %i (%s)\n", value, value, register_idx,
         register_names[register_idx]);
 
-  // ignore writes to zero
-  switch (register_idx) {
-  case REG_ZERO:
+    // ignore writes to zero
+    switch (register_idx) {
+    case REG_ZERO:
+        return 0;
+    }
+
+    registers->unnamed[register_idx] = value;
     return 0;
-  }
-
-  registers->unnamed[register_idx] = value;
-  return 0;
 }
 
-int read_register(const registers_t *registers, int register_idx, void *out) {
-  if (register_idx < 0 || register_idx > 31) {
-    return -1;
-  }
+int read_register(const registers_t* registers, int register_idx, void* out) {
+    if (register_idx < 0 || register_idx > 31) {
+        return -1;
+    }
 
-  DEBUG("reading register %i (%s): ", register_idx,
+    DEBUG("reading register %i (%s): ", register_idx,
         register_names[register_idx]);
 
-  // *out = registers->unnamed[register_idx];
-  memcpy(out, &registers->unnamed[register_idx], sizeof(int));
+    // *out = registers->unnamed[register_idx];
+    memcpy(out, &registers->unnamed[register_idx], sizeof(int));
 
-  DEBUG("%i (%x)\n", (int)out, (int)out);
+    DEBUG("%i (%x)\n", (int)out, (int)out);
 
-  return 0;
+    return 0;
 }
 
-void init_BHT(branch_prediction_data_t *data, int size) {
-  if (data != NULL && data->BranchHistoryTable != NULL) {
-    free(data->BranchHistoryTable);
-  }
-  uint8_t *bht = (uint8_t *)calloc(size, sizeof(uint8_t));
-  for (int i = 0; i < size; i++) {
-    bht[i] = 1;
-  }
-  data->BranchHistoryTable = bht;
-  data->BranchHistoryTableSize = size;
-  data->GlobalHistoryRegister = 0;
+void init_BHT(branch_prediction_data_t* data, int size) {
+    if (data != NULL && data->BranchHistoryTable != NULL) {
+        free(data->BranchHistoryTable);
+    }
+    uint8_t* bht = (uint8_t*)calloc(size, sizeof(uint8_t));
+    for (int i = 0; i < size; i++) {
+        bht[i] = 1;
+    }
+    data->BranchHistoryTable = bht;
+    data->BranchHistoryTableSize = size;
+    data->GlobalHistoryRegister = 0;
 }
 
-int branch_prediction(branch_prediction_data_t *data, int pc, int offset, predictor_mode predictor) {
-  int bimodal_index;
-  int bimodal_state;
-  int gShare_index;
-  int counter;
-  int prediction;
+int branch_prediction(branch_prediction_data_t* data, int pc, int offset, predictor_mode predictor) {
+    int bimodal_index;
+    int bimodal_state;
+    int gShare_index;
+    int counter;
+    int prediction;
 
-  switch (predictor) {
+    switch (predictor) {
 
-  case NT:
-    return pc + 4; // not taken
+    case NT:
+        return pc + 4; // not taken
 
-  case BTFNT:
-    if (offset < 0) {
-      return pc + offset; // taken
-    } else {
-      return pc + 4; // not taken
+    case BTFNT:
+        if (offset < 0) {
+            return pc + offset; // taken
+        } else {
+            return pc + 4; // not taken
+        }
+
+    case Bimodal:
+        bimodal_index = (pc >> 2) & (data->BranchHistoryTableSize - 1);
+        bimodal_state = data->BranchHistoryTable[bimodal_index];
+
+        if (offset < 0) {               // taken
+            if (data->BranchHistoryTable[bimodal_index] < 3) { // not strongly taken
+                data->BranchHistoryTable[bimodal_index]++;       // move closer to it
+            }
+        } else {                        // not taken
+            if (data->BranchHistoryTable[bimodal_index] > 0) { // not stongly not taken
+                data->BranchHistoryTable[bimodal_index]--;       // move closer to it
+            }
+        }
+
+        if (bimodal_state >= 2) {
+            return pc + offset;
+        } else {
+            return pc + 4;
+        }
+
+    case gShare:
+        gShare_index = ((pc >> 2) ^ data->GlobalHistoryRegister) & (data->BranchHistoryTableSize - 1);
+        counter = data->BranchHistoryTable[gShare_index];
+        prediction = (counter >= 2); // saved before decrementing / incrementing.
+
+        if (offset < 0) { // taken
+            if (counter < 3) {
+                counter++;
+            }
+        } else { // not taken
+            if (counter > 0) {
+                counter--;
+            }
+        }
+
+        data->BranchHistoryTable[gShare_index] = counter;
+        data->GlobalHistoryRegister = ((data->GlobalHistoryRegister << 1) | (offset < 0)) & GHR_MASK;
+
+        if (prediction) {
+            return pc + offset; // taken
+        } else {
+            return pc + 4; // not taken
+        }
+
+    default:
+        return pc + 4; // if something goes wrong, don't take anything.
     }
-
-  case Bimodal:
-    bimodal_index = (pc >> 2) & (data->BranchHistoryTableSize - 1);
-    bimodal_state = data->BranchHistoryTable[bimodal_index];
-
-    if (offset < 0) {               // taken
-      if (data->BranchHistoryTable[bimodal_index] < 3) { // not strongly taken
-        data->BranchHistoryTable[bimodal_index]++;       // move closer to it
-      }
-    } else {                        // not taken
-      if (data->BranchHistoryTable[bimodal_index] > 0) { // not stongly not taken
-        data->BranchHistoryTable[bimodal_index]--;       // move closer to it
-      }
-    }
-
-    if (bimodal_state >= 2) {
-      return pc + offset;
-    } else {
-      return pc + 4;
-    }
-
-  case gShare:
-    gShare_index = ((pc >> 2) ^ data->GlobalHistoryRegister) & (data->BranchHistoryTableSize - 1);
-    counter = data->BranchHistoryTable[gShare_index];
-    prediction = (counter >= 2); // saved before decrementing / incrementing.
-
-    if (offset < 0) { // taken
-      if (counter < 3) {
-        counter++;
-      }
-    } else { // not taken
-      if (counter > 0) {
-        counter--;
-      }
-    }
-
-    data->BranchHistoryTable[gShare_index] = counter;
-    data->GlobalHistoryRegister = ((data->GlobalHistoryRegister << 1) | (offset < 0)) & GHR_MASK;
-
-    if (prediction) {
-      return pc + offset; // taken
-    } else {
-      return pc + 4; // not taken
-    }
-
-  default:
-    return pc + 4; // if something goes wrong, don't take anything.
-  }
 }
 
-struct Stat simulate(struct memory *mem, int start_addr, FILE *log_file,
-                     struct symbols *symbols) {
-  int run = 1;
-  registers_t registers;
-  memset(&registers, 0, sizeof(registers_t));
-  registers.named.pc = start_addr;
+struct Stat simulate(struct memory* mem, int start_addr, FILE* log_file,
+    struct symbols* symbols) {
+    int run = 1;
+    registers_t registers;
+    memset(&registers, 0, sizeof(registers_t));
+    registers.named.pc = start_addr;
 
-  // Better variable names please
-  branch_prediction_data_t branch_prediction;
-  init_BHT(&branch_prediction, 16);
+    branch_prediction_data_t branch_prediction;
+    init_BHT(&branch_prediction, 16);
 
-  struct Stat stats = {0};
+    struct Stat stats = { 0 };
 
-  file = log_file;
+    file = log_file;
 
-  while (run) {
-    unsigned int m = memory_read_word(mem, registers.named.pc);
-    instruction_t *op = (instruction_t *)&m;
+    while (run) {
+        unsigned int m = memory_read_word(mem, registers.named.pc);
+        instruction_t* op = (instruction_t*)&m;
 
-    if (debug) {
-      char disassembly[100];
-      disassemble(registers.named.pc, m, disassembly, 100, NULL);
-      DEBUG("%8x : %08X       %s\n", registers.named.pc, m, disassembly);
-      fflush(stderr);
+        if (debug) {
+            char disassembly[100];
+            disassemble(registers.named.pc, m, disassembly, 100, NULL);
+            DEBUG("%8x : %08X       %s\n", registers.named.pc, m, disassembly);
+            fflush(stderr);
+        }
+
+        int ret = simulate_single(mem, &registers, log_file, *op);
+        switch (ret) {
+        case 0:
+            // all is good
+            break;
+        case END_SIMULATION: // end simulation
+            run = 0;
+            break;
+        case JUMP_WITHOUT_PC_INCREMENT: // continue without incrementing pc
+            stats.instructions++;
+            continue;
+            break;
+        case UNKNOWN_INSTRUCTION: // Unknown instruction
+            unknown_instruction(op);
+            assert(0);
+            break;
+        default:
+            DEBUG("simulator returned unknown return type: %i\n", ret);
+            assert(0);
+        }
+
+        stats.instructions++;
+
+        registers.named.pc += 4;
     }
 
-    // this is a NOP?
-    //
-    // int offset = 8;
-    // branch_prediction(registers.named.pc, offset, NT);
-
-    int ret = simulate_single(mem, &registers, log_file, *op);
-    switch (ret) {
-    case 0:
-      // all is good
-      break;
-    case END_SIMULATION: // end simulation
-      run = 0;
-      break;
-    case JUMP_WITHOUT_PC_INCREMENT: // continue without incrementing pc
-      stats.instructions++;
-      continue;
-      break;
-    case UNKNOWN_INSTRUCTION: // Unknown instruction
-      unknown_instruction(op);
-      assert(0);
-      break;
-    default:
-      DEBUG("simulator returned unknown return type: %i\n", ret);
-      assert(0);
-    }
-
-    stats.instructions++;
-
-    registers.named.pc += 4;
-  }
-
-  return stats;
+    return stats;
 }
 
-int simulate_single(struct memory *mem, registers_t *registers, FILE *log_file,
-                    instruction_t op) {
-  switch (op.opcode) {
+int simulate_single(struct memory* mem, registers_t* registers, FILE* log_file,
+    instruction_t op) {
+    switch (op.opcode) {
 
-  case OP_AUIPC: {
-    int imm20 = decode_u_immediate(&op);
-    int rd = extract_bits_instruction(&op, 11, 7);
-    write_register(registers, rd, imm20 << 12);
-    break;
-  }
-
-  case OP_ADD: {
-    int rd = extract_bits_instruction(&op, 11, 7);
-    int rs1 = extract_bits_instruction(&op, 19, 15);
-    int rs2 = extract_bits_instruction(&op, 24, 20);
-    read_register(registers, rs1, &rs1);
-    read_register(registers, rs2, &rs2);
-
-    write_register(registers, rd, rs1 + rs2);
-    break;
-  }
-
-  case OP_ADDI: {
-    int imm12 = decode_i_immediate(&op);
-    int imm = sign_extend(imm12, 12);
-    int rd = extract_bits_instruction(&op, 11, 7);
-    int rs1 = extract_bits_instruction(&op, 19, 15);
-    int rs1_value;
-    read_register(registers, rs1, &rs1_value);
-    int funct3 = extract_bits_instruction(&op, 14, 12);
-    switch (funct3) {
-    // addi
-    case 0: {
-      write_register(registers, rd, rs1_value + imm);
-      break;
-    }
-    // andi
-    case 7: {
-      write_register(registers, rd, rs1_value & imm);
-      break;
-    }
-    default:
-      DEBUG("in addi: Unknown funct3 %i\n", funct3);
-      return UNKNOWN_INSTRUCTION;
-    };
-    break;
-  }
-
-  case OP_LUI: {
-    int rd = extract_bits_instruction(&op, 11, 7);
-    int imm12 = extract_bits_instruction(&op, 31, 12);
-    int imm = imm12 << 12;
-    write_register(registers, rd, imm);
-    break;
-  }
-
-  case OP_JAL: {
-    int rd = extract_bits_instruction(&op, 11, 7);
-    int imm = decode_j_immediate_sign_extended(&op);
-    write_register(registers, rd, registers->named.pc + 4);
-    DEBUG("Jumping by %i\n", imm);
-    registers->named.pc += imm;
-    return JUMP_WITHOUT_PC_INCREMENT;
-    break;
-  }
-
-  case OP_SW: {
-    int rs1 = extract_bits_instruction(&op, 19, 15);
-    int rs2 = extract_bits_instruction(&op, 24, 20);
-    int imm = decode_s_immediate_sign_extended(&op);
-    int addr_start;
-    read_register(registers, rs1, &addr_start);
-    int rs2_value;
-    read_register(registers, rs2, &rs2_value);
-
-    DEBUG("imm: %i\n", imm);
-
-    int funct3 = extract_bits_instruction(&op, 14, 12);
-    switch (funct3) {
-    case 0:
-      DEBUG("Writing %2x to %8x\n", rs2_value, addr_start + imm);
-      memory_write_byte(mem, addr_start + imm, rs2_value);
-      break;
-    case 2: // sw
-      DEBUG("Writing %8x to %8x\n", rs2_value, addr_start + imm);
-      memory_write_word(mem, addr_start + imm, rs2_value);
-      break;
-    }
-    break;
-  }
-
-  case OP_LW: {
-    int funct3 = extract_bits_instruction(&op, 14, 12);
-    int rd = extract_bits_instruction(&op, 11, 7);
-    int rs1 = extract_bits_instruction(&op, 19, 15);
-    int imm = decode_i_immediate(&op);
-    int addr_start;
-    read_register(registers, rs1, &addr_start);
-    DEBUG("imm: %i\n", imm);
-    switch (funct3) {
-    // lw
-    case 2: {
-      int word = memory_read_word(mem, addr_start + imm);
-      DEBUG("Read %8x from %8x\n", word, addr_start + imm);
-      write_register(registers, rd, word);
-      break;
-    }
-    // lbu
-    case 4: {
-      int word = memory_read_byte(mem, addr_start + imm);
-      DEBUG("Read %2x from %8x\n", word, addr_start + imm);
-      write_register(registers, rd, word);
-      break;
-    }
-    default:
-      DEBUG("in lw: Unknown funct3 %i\n", funct3);
-      return UNKNOWN_INSTRUCTION;
-    };
-    break;
-  }
-
-  case OP_JALR: {
-    int rd = extract_bits_instruction(&op, 11, 7);
-    int rs1 = extract_bits_instruction(&op, 19, 15);
-    int imm12 = decode_i_immediate(&op);
-    int imm = sign_extend(imm12, 12);
-    read_register(registers, rs1, &rs1);
-
-    // set LSB to 0
-    int target_addr = ((rs1 + imm) >> 1) << 1;
-
-    // write current pc to rd
-    write_register(registers, rd, registers->named.pc + 4);
-
-    DEBUG("Jumping to %i\n", target_addr);
-    registers->named.pc = target_addr;
-    return JUMP_WITHOUT_PC_INCREMENT;
-    break;
-  }
-
-  case OP_BEQ: {
-    int rs1 = extract_bits_instruction(&op, 19, 15);
-    int rs2 = extract_bits_instruction(&op, 24, 20);
-    int imm12 = decode_b_immediate_sign_extended(&op);
-
-    DEBUG("imm: %i\n", imm12);
-
-    int funct3 = extract_bits_instruction(&op, 14, 12);
-    switch (funct3) {
-
-    // beq
-    case 0: {
-      read_register(registers, rs1, &rs1);
-      read_register(registers, rs2, &rs2);
-      if (rs1 == rs2) {
-        registers->named.pc += imm12;
-        DEBUG("branching to %i\n", registers->named.pc);
-        return 5;
-      }
-      break;
+    case OP_AUIPC: {
+        int imm20 = decode_u_immediate(&op);
+        int rd = extract_bits_instruction(&op, 11, 7);
+        write_register(registers, rd, imm20 << 12);
+        break;
     }
 
-    // bne
-    case 1: {
-      read_register(registers, rs1, &rs1);
-      read_register(registers, rs2, &rs2);
-      if (rs1 != rs2) {
-        registers->named.pc += imm12;
-        DEBUG("branching to %i\n", registers->named.pc);
-        return 5;
-      }
-      break;
+    case OP_ADD: {
+        int rd = extract_bits_instruction(&op, 11, 7);
+        int rs1 = extract_bits_instruction(&op, 19, 15);
+        int rs2 = extract_bits_instruction(&op, 24, 20);
+        read_register(registers, rs1, &rs1);
+        read_register(registers, rs2, &rs2);
+
+        write_register(registers, rd, rs1 + rs2);
+        break;
     }
 
-    // blt
-    case 4: {
-      read_register(registers, rs1, &rs1);
-      read_register(registers, rs2, &rs2);
-      if (rs1 < rs2) {
-        registers->named.pc += imm12;
-        DEBUG("branching to %i\n", registers->named.pc);
-        return 5;
-      }
-      break;
+    case OP_ADDI: {
+        int imm12 = decode_i_immediate(&op);
+        int imm = sign_extend(imm12, 12);
+        int rd = extract_bits_instruction(&op, 11, 7);
+        int rs1 = extract_bits_instruction(&op, 19, 15);
+        int rs1_value;
+        read_register(registers, rs1, &rs1_value);
+        int funct3 = extract_bits_instruction(&op, 14, 12);
+        switch (funct3) {
+            // addi
+        case 0: {
+            write_register(registers, rd, rs1_value + imm);
+            break;
+        }
+              // andi
+        case 7: {
+            write_register(registers, rd, rs1_value & imm);
+            break;
+        }
+        default:
+            DEBUG("in addi: Unknown funct3 %i\n", funct3);
+            return UNKNOWN_INSTRUCTION;
+        };
+        break;
     }
 
-    // bge
-    case 5: {
-      read_register(registers, rs1, &rs1);
-      read_register(registers, rs2, &rs2);
-      if (rs1 >= rs2) {
-        registers->named.pc += imm12;
-        DEBUG("branching to %i\n", registers->named.pc);
-        return 5;
-      }
-      break;
+    case OP_LUI: {
+        int rd = extract_bits_instruction(&op, 11, 7);
+        int imm12 = extract_bits_instruction(&op, 31, 12);
+        int imm = imm12 << 12;
+        write_register(registers, rd, imm);
+        break;
     }
 
-    // bltu
-    case 6: {
-      unsigned int rs1_u;
-      unsigned int rs2_u;
-      read_register(registers, rs1, &rs1_u);
-      read_register(registers, rs2, &rs2_u);
-      if (rs1_u < rs2_u) {
-        registers->named.pc += imm12;
-        DEBUG("branching to %i\n", registers->named.pc);
-        return 5;
-      }
-      break;
+    case OP_JAL: {
+        int rd = extract_bits_instruction(&op, 11, 7);
+        int imm = decode_j_immediate_sign_extended(&op);
+        write_register(registers, rd, registers->named.pc + 4);
+        DEBUG("Jumping by %i\n", imm);
+        registers->named.pc += imm;
+        return JUMP_WITHOUT_PC_INCREMENT;
+        break;
     }
 
-    // bgeu
-    case 7: {
-      unsigned int rs1_u;
-      unsigned int rs2_u;
-      read_register(registers, rs1, &rs1_u);
-      read_register(registers, rs2, &rs2_u);
-      if (rs1_u >= rs2_u) {
-        registers->named.pc += imm12;
-        DEBUG("branching to %i\n", registers->named.pc);
-        return 5;
-      }
-      break;
+    case OP_SW: {
+        int rs1 = extract_bits_instruction(&op, 19, 15);
+        int rs2 = extract_bits_instruction(&op, 24, 20);
+        int imm = decode_s_immediate_sign_extended(&op);
+        int addr_start;
+        read_register(registers, rs1, &addr_start);
+        int rs2_value;
+        read_register(registers, rs2, &rs2_value);
+
+        DEBUG("imm: %i\n", imm);
+
+        int funct3 = extract_bits_instruction(&op, 14, 12);
+        switch (funct3) {
+        case 0:
+            DEBUG("Writing %2x to %8x\n", rs2_value, addr_start + imm);
+            memory_write_byte(mem, addr_start + imm, rs2_value);
+            break;
+        case 2: // sw
+            DEBUG("Writing %8x to %8x\n", rs2_value, addr_start + imm);
+            memory_write_word(mem, addr_start + imm, rs2_value);
+            break;
+        }
+        break;
     }
 
-    default:
-      DEBUG("in beq: Unknown funct3 %i\n", funct3);
-      return UNKNOWN_INSTRUCTION;
-    };
-    break;
-  }
-
-  case OP_ECALL: {
-    switch (registers->named.a7) {
-    case 1:
-      registers->named.a0 = getchar();
-      break;
-
-    case 2:
-      DEBUG("put char: %c (%x)\n", registers->named.a0, registers->named.a0);
-      putchar(registers->named.a0);
-      break;
-
-    case 3:
-    case 93:
-      return END_SIMULATION;
-      break;
-
-    default:
-      DEBUG("Unknown ecall %i\n", registers->named.a7);
-      return UNKNOWN_INSTRUCTION;
-      break;
+    case OP_LW: {
+        int funct3 = extract_bits_instruction(&op, 14, 12);
+        int rd = extract_bits_instruction(&op, 11, 7);
+        int rs1 = extract_bits_instruction(&op, 19, 15);
+        int imm = decode_i_immediate(&op);
+        int addr_start;
+        read_register(registers, rs1, &addr_start);
+        DEBUG("imm: %i\n", imm);
+        switch (funct3) {
+            // lw
+        case 2: {
+            int word = memory_read_word(mem, addr_start + imm);
+            DEBUG("Read %8x from %8x\n", word, addr_start + imm);
+            write_register(registers, rd, word);
+            break;
+        }
+              // lbu
+        case 4: {
+            int word = memory_read_byte(mem, addr_start + imm);
+            DEBUG("Read %2x from %8x\n", word, addr_start + imm);
+            write_register(registers, rd, word);
+            break;
+        }
+        default:
+            DEBUG("in lw: Unknown funct3 %i\n", funct3);
+            return UNKNOWN_INSTRUCTION;
+        };
+        break;
     }
-    break;
-  }
 
-  default: // Unknown or unimplemented instruction
-    return UNKNOWN_INSTRUCTION;
-    break;
-  }
+    case OP_JALR: {
+        int rd = extract_bits_instruction(&op, 11, 7);
+        int rs1 = extract_bits_instruction(&op, 19, 15);
+        int imm12 = decode_i_immediate(&op);
+        int imm = sign_extend(imm12, 12);
+        read_register(registers, rs1, &rs1);
 
-  return 0;
+        // set LSB to 0
+        int target_addr = ((rs1 + imm) >> 1) << 1;
+
+        // write current pc to rd
+        write_register(registers, rd, registers->named.pc + 4);
+
+        DEBUG("Jumping to %i\n", target_addr);
+        registers->named.pc = target_addr;
+        return JUMP_WITHOUT_PC_INCREMENT;
+        break;
+    }
+
+    case OP_BEQ: {
+        int rs1 = extract_bits_instruction(&op, 19, 15);
+        int rs2 = extract_bits_instruction(&op, 24, 20);
+        int imm12 = decode_b_immediate_sign_extended(&op);
+
+        DEBUG("imm: %i\n", imm12);
+
+        int funct3 = extract_bits_instruction(&op, 14, 12);
+        switch (funct3) {
+
+            // beq
+        case 0: {
+            read_register(registers, rs1, &rs1);
+            read_register(registers, rs2, &rs2);
+            if (rs1 == rs2) {
+                registers->named.pc += imm12;
+                DEBUG("branching to %i\n", registers->named.pc);
+                return 5;
+            }
+            break;
+        }
+
+              // bne
+        case 1: {
+            read_register(registers, rs1, &rs1);
+            read_register(registers, rs2, &rs2);
+            if (rs1 != rs2) {
+                registers->named.pc += imm12;
+                DEBUG("branching to %i\n", registers->named.pc);
+                return 5;
+            }
+            break;
+        }
+
+              // blt
+        case 4: {
+            read_register(registers, rs1, &rs1);
+            read_register(registers, rs2, &rs2);
+            if (rs1 < rs2) {
+                registers->named.pc += imm12;
+                DEBUG("branching to %i\n", registers->named.pc);
+                return 5;
+            }
+            break;
+        }
+
+              // bge
+        case 5: {
+            read_register(registers, rs1, &rs1);
+            read_register(registers, rs2, &rs2);
+            if (rs1 >= rs2) {
+                registers->named.pc += imm12;
+                DEBUG("branching to %i\n", registers->named.pc);
+                return 5;
+            }
+            break;
+        }
+
+              // bltu
+        case 6: {
+            unsigned int rs1_u;
+            unsigned int rs2_u;
+            read_register(registers, rs1, &rs1_u);
+            read_register(registers, rs2, &rs2_u);
+            if (rs1_u < rs2_u) {
+                registers->named.pc += imm12;
+                DEBUG("branching to %i\n", registers->named.pc);
+                return 5;
+            }
+            break;
+        }
+
+              // bgeu
+        case 7: {
+            unsigned int rs1_u;
+            unsigned int rs2_u;
+            read_register(registers, rs1, &rs1_u);
+            read_register(registers, rs2, &rs2_u);
+            if (rs1_u >= rs2_u) {
+                registers->named.pc += imm12;
+                DEBUG("branching to %i\n", registers->named.pc);
+                return 5;
+            }
+            break;
+        }
+
+        default:
+            DEBUG("in beq: Unknown funct3 %i\n", funct3);
+            return UNKNOWN_INSTRUCTION;
+        };
+        break;
+    }
+
+    case OP_ECALL: {
+        switch (registers->named.a7) {
+        case 1:
+            registers->named.a0 = getchar();
+            break;
+
+        case 2:
+            DEBUG("put char: %c (%x)\n", registers->named.a0, registers->named.a0);
+            putchar(registers->named.a0);
+            break;
+
+        case 3:
+        case 93:
+            return END_SIMULATION;
+            break;
+
+        default:
+            DEBUG("Unknown ecall %i\n", registers->named.a7);
+            return UNKNOWN_INSTRUCTION;
+            break;
+        }
+        break;
+    }
+
+    default: // Unknown or unimplemented instruction
+        return UNKNOWN_INSTRUCTION;
+        break;
+    }
+
+    return 0;
 }
