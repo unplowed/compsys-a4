@@ -22,20 +22,23 @@ inline void print_bytes(void *data, size_t size) {
 
 #define ASSERT(cond, msg)                                                      \
   if (!(cond)) {                                                               \
-    printf("Assert failed! condition '%s': %s\n", #cond, msg);                 \
+    printf("Assert failed! condition '%s': %s\n%s:%i\n", #cond, msg, __FILE__, \
+           __LINE__);                                                          \
     return -1;                                                                 \
   }
 
 #define ASSERT_STR_EQ(str1, str2)                                              \
   if (strcmp(str1, str2)) {                                                    \
-    printf("Assert failed! '%s' != '%s'\n", str1, str2);                       \
+    printf("Assert failed! '%s' != '%s'\n%s:%i\n", str1, str2, __FILE__,       \
+           __LINE__);                                                          \
     return -1;                                                                 \
   }
 
 #define ASSERT_MEM_EQ(addr1, addr2, size)                                      \
   if (memcmp(addr1, addr2, size) != 0) {                                       \
-    printf("Assert failed! Memory at locations %p, %p was different!\n",       \
-           addr1, addr2);                                                      \
+    printf(                                                                    \
+        "Assert failed! Memory at locations %p, %p was different!\n%s:%i\n",   \
+        addr1, addr2);                                                         \
     printf("%p: \n", addr1);                                                   \
     print_bytes(addr1, size);                                                  \
     printf("\n\n%p: \n", addr2);                                               \
@@ -46,36 +49,42 @@ inline void print_bytes(void *data, size_t size) {
 
 #define ASSERT_EQ(a, b)                                                        \
   if (a != b) {                                                                \
-    printf("Assert failed! %s == %s, %i == %i\n", #a, #b, a, b);               \
+    printf("Assert failed! %s == %s, %i == %i\n%s:%i\n", #a, #b, a, b,         \
+           __FILE__, __LINE__);                                                \
     return -1;                                                                 \
   }
 
 #define ASSERT_NEQ(a, b)                                                       \
   if (a == b) {                                                                \
-    printf("Assert failed! %s != %s, %i != %i\n", #a, #b, a, b);               \
+    printf("Assert failed! %s != %s, %i != %i\n%s:%i\n", #a, #b, a, b,         \
+           __FILE__, __LINE__);                                                \
     return -1;                                                                 \
   }
 
 #define ASSERT_LT(a, b, msg)                                                   \
   if (!(a < b)) {                                                              \
-    printf("Assert failed! %s < %s, %i < %i\n", #a, #b, a, b);                 \
+    printf("Assert failed! %s < %s, %i < %i\n%s:%i\n", #a, #b, a, b, __FILE__, \
+           __LINE__);                                                          \
     return -1;                                                                 \
   }
 
 #define ASSERT_GR(a, b, msg)                                                   \
   if (!(a > b)) {                                                              \
-    printf("Assert failed! %s < %s, %i < %i\n", #a, #b, a, b);                 \
+    printf("Assert failed! %s < %s, %i < %i\n%s:%i\n", #a, #b, a, b, __FILE__, \
+           __LINE__);                                                          \
     return -1;                                                                 \
   }
 
 #define ASSERT_LTE(a, b, msg)                                                  \
   if (!(a <= b)) {                                                             \
-    printf("Assert failed! %s < %s, %i < %i\n", #a, #b, a, b);                 \
+    printf("Assert failed! %s < %s, %i < %i\n%s:%i\n", #a, #b, a, b, __FILE__, \
+           __LINE__);                                                          \
     return -1;                                                                 \
   }
 
 #define ASSERT_GRE(a, b, msg)                                                  \
   if (!(a >= b)) {                                                             \
-    printf("Assert failed! %s < %s, %i < %i\n", #a, #b, a, b);                 \
+    printf("Assert failed! %s < %s, %i < %i\n%s:%i\n", #a, #b, a, b, __FILE__, \
+           __LINE__);                                                          \
     return -1;                                                                 \
   }
